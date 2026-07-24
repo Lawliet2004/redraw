@@ -1,0 +1,264 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.app-shell__canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.app-shell__canvas .excalidraw {
+  height: 100%;
+}
+
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #666;
+  font-size: 14px;
+}
+
+/* single chrome: tabs + window controls */
+.titlebar {
+  flex: 0 0 40px;
+  height: 40px;
+  background: #f0f0f2;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: stretch;
+  user-select: none;
+  z-index: 10;
+}
+
+.titlebar--dark {
+  background: var(--island-bg-color, #1e1e24);
+  border-bottom-color: #333;
+  color: var(--color-on-surface, #e3e3e8);
+}
+
+.titlebar__brand {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  white-space: nowrap;
+}
+
+.titlebar__logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  -webkit-user-drag: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.titlebar__name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0.85;
+}
+
+.titlebar__tabs {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  min-width: 0;
+  max-width: calc(100% - 200px);
+  padding: 4px 0 0;
+  gap: 2px;
+}
+
+.titlebar__spacer {
+  flex: 1;
+  min-width: 24px;
+}
+
+.titlebar__add {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  margin: 2px 4px 0;
+  align-self: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.65;
+}
+
+.titlebar__add:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.titlebar--dark .titlebar__add:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.page-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 160px;
+  min-width: 72px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  color: inherit;
+  opacity: 0.7;
+  border-bottom: 2px solid transparent;
+}
+
+.page-tab:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.titlebar--dark .page-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.page-tab--active {
+  opacity: 1;
+  background: #fff;
+  border-bottom-color: var(--color-primary, #6965db);
+  font-weight: 600;
+}
+
+.titlebar--dark .page-tab--active {
+  background: #2a2a32;
+}
+
+.page-tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.page-tab__input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-primary, #6965db);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font: inherit;
+  background: #fff;
+  color: #111;
+}
+
+.titlebar--dark .page-tab__input {
+  background: #1a1a1f;
+  color: #eee;
+}
+
+.page-tab__close {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+}
+
+.page-tab:hover .page-tab__close,
+.page-tab--active .page-tab__close {
+  opacity: 0.7;
+}
+
+.page-tab__close:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.page-tab__close:disabled {
+  opacity: 0 !important;
+  cursor: default;
+  pointer-events: none;
+}
+
+.titlebar__controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+}
+
+.win-btn {
+  width: 46px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.85;
+  padding: 0;
+}
+
+.win-btn:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.titlebar--dark .win-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.win-btn--close:hover {
+  background: #e81123 !important;
+  color: #fff;
+  opacity: 1;
+}
+
+/* interactive bits must not drag the window */
+.no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* hide stock Excalidraw chrome not used by this app */
+.app-shell__canvas .default-sidebar-trigger,
+.app-shell__canvas .sidebar-trigger,
+.app-shell__canvas .help-icon {
+  display: none !important;
+}

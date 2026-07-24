@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7a7a80"/>
+      <stop offset="100%" stop-color="#5a5a60"/>
+    </linearGradient>
+    <radialGradient id="glowG" cx="55%" cy="40%" r="40%">
+      <stop offset="0%" stop-color="#b8ff2a" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#b8ff2a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="40%" cy="60%" r="40%">
+      <stop offset="0%" stop-color="#00aaff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#00aaff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lime" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4ff3a"/>
+      <stop offset="100%" stop-color="#3dcc40"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2af0b0"/>
+      <stop offset="100%" stop-color="#0088cc"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6dff6a"/>
+      <stop offset="100%" stop-color="#1a9a50"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0066ff"/>
+      <stop offset="50%" stop-color="#00e0ff"/>
+      <stop offset="100%" stop-color="#c8ff60"/>
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="blur8" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="280" cy="200" r="150" fill="url(#glowG)"/>
+  <circle cx="200" cy="280" r="130" fill="url(#glowB)"/>
+
+  <!-- cubes -->
+  <g filter="url(#soft)">
+    <rect x="200" y="148" width="145" height="50" rx="12" fill="url(#lime)"/>
+    <path d="M155 175 L200 155 L200 205 L155 225 Z" fill="url(#teal)" opacity="0.95"/>
+    <rect x="185" y="208" width="44" height="44" rx="8" fill="url(#teal)"/>
+    <rect x="237" y="208" width="44" height="44" rx="8" fill="url(#green)"/>
+    <rect x="185" y="260" width="44" height="44" rx="8" fill="url(#teal)"/>
+    <rect x="237" y="260" width="44" height="44" rx="8" fill="url(#green)"/>
+    <rect x="145" y="228" width="48" height="72" rx="10" fill="url(#teal)" opacity="0.9"/>
+    <rect x="270" y="298" width="72" height="72" rx="12" fill="url(#green)"/>
+  </g>
+
+  <!-- orbital rings -->
+  <g fill="none" stroke-linecap="round" filter="url(#soft)">
+    <path d="M95 310 C90 200 160 110 280 105 C380 100 430 160 420 200" stroke="url(#ring)" stroke-width="22" opacity="0.35"/>
+    <path d="M100 315 C95 205 165 118 285 112 C375 108 420 165 412 205" stroke="url(#ring)" stroke-width="12" opacity="0.75"/>
+    <path d="M108 318 C105 215 175 128 290 120 C365 115 408 168 400 208" stroke="#e8fff0" stroke-width="4" opacity="0.9"/>
+    <path d="M120 340 C100 280 130 230 170 210" stroke="url(#ring)" stroke-width="10" opacity="0.5"/>
+  </g>
+  <circle cx="405" cy="148" r="14" fill="#ffffcc" filter="url(#blur8)"/>
+  <circle cx="405" cy="148" r="6" fill="#ffffff"/>
+</svg>

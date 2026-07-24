@@ -1,0 +1,27 @@
+[package]
+name = "redraw"
+version = "0.1.0"
+description = "Local infinite-canvas whiteboard"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "tauri_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["image-png"] }
+serde = { version = "1", features = ["derive"] }
+tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-fs = "2.5.1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
