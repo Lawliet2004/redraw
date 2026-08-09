@@ -148,7 +148,17 @@ export default function PageTabBar({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="page-tab__label">{page.name}</span>
+                <span
+                  className="page-tab__label"
+                  style={{
+                    color: theme === "dark" ? "#ffffff" : "#000000",
+                    WebkitTextFillColor: theme === "dark" ? "#ffffff" : "#000000",
+                    fontWeight: 800,
+                    opacity: 1,
+                  }}
+                >
+                  {page.name}
+                </span>
               )}
               <button
                 type="button"

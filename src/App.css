@@ -136,15 +136,17 @@ body,
   height: 32px;
   padding: 0 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   border-radius: 8px 8px 0 0;
-  color: #222228;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000;
   border-bottom: 2px solid transparent;
 }
 
 .titlebar--dark .page-tab {
-  color: #ebebf0;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
 }
 
 .page-tab:hover {
@@ -158,13 +160,15 @@ body,
 .page-tab--active {
   background: #fff;
   border-bottom-color: var(--color-primary, #6965db);
-  color: #111116;
-  font-weight: 700;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000;
+  font-weight: 800;
 }
 
 .titlebar--dark .page-tab--active {
   background: #2a2a32;
-  color: #ffffff;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
 }
 
 .page-tab__label {
@@ -172,8 +176,17 @@ body,
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  color: inherit;
-  opacity: 1;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000;
+  opacity: 1 !important;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.titlebar--dark .page-tab__label {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
 }
 
 .page-tab__input {
@@ -318,15 +331,45 @@ body {
   min-height: 44px;
   height: 44px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: 15px;
   border-radius: 10px;
   border-bottom: none;
   margin-bottom: 4px;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000;
+  background: #e8e8ec;
+}
+
+.titlebar--dark.titlebar--touch .page-tab {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+  background: #3a3a44;
 }
 
 .titlebar--touch .page-tab--active {
   border-bottom: none;
+  background: #ffffff !important;
   box-shadow: inset 0 0 0 2px var(--color-primary, #6965db);
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000;
+}
+
+.titlebar--dark.titlebar--touch .page-tab--active {
+  background: #2a2a32 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+.titlebar--touch .page-tab__label {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.titlebar--dark.titlebar--touch .page-tab__label {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
 }
 
 .titlebar--touch .page-tab__close {
