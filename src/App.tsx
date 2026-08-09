@@ -281,7 +281,7 @@ export default function App() {
   const handleCreate = useCallback(async () => {
     await flushSave();
     const count = (await listPages()).length;
-    const page = await createPage(`Page ${count + 1}`);
+    const page = await createPage(`P${count + 1}`);
     setPages((prev) => [...prev, page]);
     setActiveId(page.id);
     activeIdRef.current = page.id;

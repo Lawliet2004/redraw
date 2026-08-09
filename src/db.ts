@@ -134,7 +134,7 @@ export async function bootstrapPages(): Promise<{
       await initDb();
       let pages = await listPages();
       if (pages.length === 0) {
-        const p = await createPage("Page 1");
+        const p = await createPage("P1");
         await setMeta("last_active_page_id", p.id);
         pages = [p];
       }
