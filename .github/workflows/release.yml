@@ -1,68 +1,162 @@
-name: Release installers
+name: Release
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+  desktop:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows x64
-            os: windows-latest
-            args: ""
-          - name: Linux x64
-            os: ubuntu-22.04
-            args: ""
-          - name: macOS Intel
-            os: macos-13
-            args: "--target x86_64-apple-darwin"
-          - name: macOS Apple Silicon
-            os: macos-14
-            args: "--target aarch64-apple-darwin"
-
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev \
-            build-essential curl wget file libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.os == 'macos-13' && 'x86_64-apple-darwin' || matrix.os == 'macos-14' && 'aarch64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
-      - name: Install dependencies
-        run: npm ci
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
-      - name: Build and publish installers
-        uses: tauri-apps/tauri-action@v0
+      - run: npm ci
+
+      - name: Build
+        run: npm run tauri build -- --target ${{ matrix.target }}
+
+      - name: Upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/dmg/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Redraw ${{ github.ref_name }}
-          releaseBody: Download the installer for your operating system below.
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;35.0.0"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: android-aarch64
+
+      - run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Android rust lib + APK
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target-android
+        run: |
+          npm run tauri -- android android-studio-script --release --target aarch64 || true
+          SO="$CARGO_TARGET_DIR/aarch64-linux-android/release/libtauri_app_lib.so"
+          test -f "$SO"
+          JNI="src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$JNI"
+          cp "$SO" "$JNI/libtauri_app_lib.so"
+          rm -rf src-tauri/gen/android/app/src/main/assets
+          mkdir -p src-tauri/gen/android/app/src/main/assets
+          cp -r dist/* src-tauri/gen/android/app/src/main/assets/
+          printf 'tauri.android.versionCode=1\ntauri.android.versionName=0.1.1\n' > src-tauri/gen/android/app/tauri.properties
+          chmod +x src-tauri/gen/android/gradlew
+          REDRAW_SKIP_RUST=1 ./src-tauri/gen/android/gradlew -p src-tauri/gen/android \
+            :app:assembleArm64Release -PabiList=arm64-v8a -PtargetList=aarch64
+
+      - name: Sign APK (debug key — sideload)
+        run: |
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          KS="$HOME/.android/debug.keystore"
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$KS" ]; then
+            keytool -genkey -v -keystore "$KS" -storepass android -alias androiddebugkey \
+              -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          UNSIGNED=$(ls src-tauri/gen/android/app/build/outputs/apk/arm64/release/*-unsigned.apk | head -1)
+          "$BT/zipalign" -f -p 4 "$UNSIGNED" redraw-android-arm64-aligned.apk
+          "$BT/apksigner" sign --ks "$KS" --ks-pass pass:android --key-pass pass:android \
+            --out Redraw-android-arm64.apk redraw-android-arm64-aligned.apk
+          "$BT/apksigner" verify Redraw-android-arm64.apk
+
+      - name: Upload Android APK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Redraw-android-arm64.apk
+          body: |
+            ## Downloads
+
+            | Platform | File |
+            |----------|------|
+            | **Android** (arm64, Android 7+) | `Redraw-android-arm64.apk` |
+            | Windows | NSIS `.exe` / MSI |
+            | Linux | AppImage / `.deb` |
+            | macOS | `.dmg` |
+
+            ### Android install
+            1. Download the APK
+            2. Allow install from unknown sources for your browser/file manager
+            3. Open the APK and install
+
+            Debug-signed for sideload. iOS IPA needs a Mac + Apple signing (not in this release).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

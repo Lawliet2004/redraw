@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isTouchUi } from "../platform";
 
 export type TabPage = {
   id: string;
@@ -28,7 +29,13 @@ export default function PageTabBar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [maximized, setMaximized] = useState(false);
+  const [touch, setTouch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setTouch(isTouchUi());
+  }, []);
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -38,16 +45,20 @@ export default function PageTabBar({
   }, [editingId]);
 
   useEffect(() => {
+    if (touch) return;
     const win = getCurrentWindow();
     let unlisten: (() => void) | undefined;
-    void win.isMaximized().then(setMaximized);
-    void win.onResized(() => {
-      void win.isMaximized().then(setMaximized);
-    }).then((fn) => {
-      unlisten = fn;
-    });
+    void win.isMaximized().then(setMaximized).catch(() => {});
+    void win
+      .onResized(() => {
+        void win.isMaximized().then(setMaximized).catch(() => {});
+      })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {});
     return () => unlisten?.();
-  }, []);
+  }, [touch]);
 
   function startEdit(page: TabPage) {
     setEditingId(page.id);
@@ -61,16 +72,24 @@ export default function PageTabBar({
     setEditingId(null);
   }
 
+  function clearLongPress() {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }
+
   const win = () => getCurrentWindow();
 
   return (
     <div
-      className={`titlebar ${theme === "dark" ? "titlebar--dark" : ""}`}
-      data-tauri-drag-region
+      className={`titlebar ${theme === "dark" ? "titlebar--dark" : ""} ${touch ? "titlebar--touch" : ""}`}
+      {...(!touch ? { "data-tauri-drag-region": true } : {})}
       onDoubleClick={(e) => {
+        if (touch) return;
         const t = e.target as HTMLElement;
         if (t.closest(".no-drag")) return;
-        void win().toggleMaximize();
+        void win().toggleMaximize().catch(() => {});
       }}
     >
       <div className="titlebar__brand no-drag" title="Redraw">
@@ -92,15 +111,34 @@ export default function PageTabBar({
                 if (editingId !== page.id) onSelect(page.id);
               }}
               onDoubleClick={(e) => {
+                if (touch) return;
                 e.stopPropagation();
                 startEdit(page);
               }}
+              onContextMenu={(e) => {
+                if (!touch) return;
+                e.preventDefault();
+                startEdit(page);
+              }}
+              onTouchStart={() => {
+                if (!touch) return;
+                clearLongPress();
+                longPressRef.current = setTimeout(() => {
+                  longPressRef.current = null;
+                  startEdit(page);
+                }, 500);
+              }}
+              onTouchEnd={clearLongPress}
+              onTouchMove={clearLongPress}
+              onTouchCancel={clearLongPress}
             >
               {editingId === page.id ? (
                 <input
                   ref={inputRef}
                   className="page-tab__input"
                   value={draft}
+                  enterKeyHint="done"
+                  autoCapitalize="sentences"
                   onChange={(e) => setDraft(e.target.value)}
                   onBlur={commitEdit}
                   onKeyDown={(e) => {
@@ -139,66 +177,68 @@ export default function PageTabBar({
         </button>
       </div>
 
-      <div className="titlebar__spacer" data-tauri-drag-region />
+      <div className="titlebar__spacer" {...(!touch ? { "data-tauri-drag-region": true } : {})} />
 
-      <div className="titlebar__controls no-drag">
-        <button
-          type="button"
-          className="win-btn"
-          title="Minimize"
-          aria-label="Minimize"
-          onClick={() => void win().minimize()}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-            <path d="M0 5h10" stroke="currentColor" strokeWidth="1.2" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          className="win-btn"
-          title={maximized ? "Restore" : "Maximize"}
-          aria-label={maximized ? "Restore" : "Maximize"}
-          onClick={() => void win().toggleMaximize()}
-        >
-          {maximized ? (
+      {!touch && (
+        <div className="titlebar__controls no-drag">
+          <button
+            type="button"
+            className="win-btn"
+            title="Minimize"
+            aria-label="Minimize"
+            onClick={() => void win().minimize().catch(() => {})}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+              <path d="M0 5h10" stroke="currentColor" strokeWidth="1.2" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="win-btn"
+            title={maximized ? "Restore" : "Maximize"}
+            aria-label={maximized ? "Restore" : "Maximize"}
+            onClick={() => void win().toggleMaximize().catch(() => {})}
+          >
+            {maximized ? (
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                <path
+                  d="M2.5 3.5h5v5h-5zM3.5 2.5h5v1M8.5 2.5v5h-1"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.1"
+                />
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                <rect
+                  x="1"
+                  y="1"
+                  width="8"
+                  height="8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            className="win-btn win-btn--close"
+            title="Close"
+            aria-label="Close"
+            onClick={() => void win().close().catch(() => {})}
+          >
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
               <path
-                d="M2.5 3.5h5v5h-5zM3.5 2.5h5v1M8.5 2.5v5h-1"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.1"
-              />
-            </svg>
-          ) : (
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-              <rect
-                x="1"
-                y="1"
-                width="8"
-                height="8"
-                fill="none"
+                d="M1 1l8 8M9 1L1 9"
                 stroke="currentColor"
                 strokeWidth="1.2"
               />
             </svg>
-          )}
-        </button>
-        <button
-          type="button"
-          className="win-btn win-btn--close"
-          title="Close"
-          aria-label="Close"
-          onClick={() => void win().close()}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-            <path
-              d="M1 1l8 8M9 1L1 9"
-              stroke="currentColor"
-              strokeWidth="1.2"
-            />
-          </svg>
-        </button>
-      </div>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

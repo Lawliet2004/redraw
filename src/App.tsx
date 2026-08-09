@@ -198,18 +198,39 @@ export default function App() {
     if (!ready) return;
     let unlisten: (() => void) | undefined;
     (async () => {
-      const win = getCurrentWindow();
-      unlisten = await win.onCloseRequested(async (event) => {
-        event.preventDefault();
-        try {
-          await flushSave();
-        } finally {
-          await win.destroy();
-        }
-      });
+      try {
+        const win = getCurrentWindow();
+        unlisten = await win.onCloseRequested(async (event) => {
+          event.preventDefault();
+          try {
+            await flushSave();
+          } finally {
+            await win.destroy();
+          }
+        });
+      } catch {
+        // mobile / no desktop window chrome
+      }
     })();
     return () => {
       unlisten?.();
+    };
+  }, [ready, flushSave]);
+
+  // persist when app backgrounds (mobile)
+  useEffect(() => {
+    if (!ready) return;
+    const onVis = () => {
+      if (document.visibilityState === "hidden") void flushSave();
+    };
+    const onHide = () => {
+      void flushSave();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", onHide);
     };
   }, [ready, flushSave]);
 

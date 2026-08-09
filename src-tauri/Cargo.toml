@@ -1,6 +1,6 @@
 [package]
 name = "redraw"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local infinite-canvas whiteboard"
 authors = ["you"]
 edition = "2021"
