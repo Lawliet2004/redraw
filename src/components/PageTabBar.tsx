@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTouchUi } from "../platform";
 
@@ -32,6 +32,7 @@ export default function PageTabBar({
   const [touch, setTouch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dark = theme === "dark";
 
   useEffect(() => {
     setTouch(isTouchUi());
@@ -81,9 +82,78 @@ export default function PageTabBar({
 
   const win = () => getCurrentWindow();
 
+  // Solid fills + white/black only — survives Android WebView force-dark
+  const barStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "stretch",
+    flex: "0 0 auto",
+    minHeight: touch ? 52 : 40,
+    background: dark ? "#1e1e24" : "#e8e8ee",
+    borderBottom: dark ? "1px solid #333" : "1px solid #c8c8d0",
+    color: dark ? "#fff" : "#111",
+    zIndex: 10,
+    userSelect: "none",
+    padding: touch ? "6px 6px 4px" : "0",
+  };
+
+  function tabStyle(active: boolean): CSSProperties {
+    if (active) {
+      return {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        minWidth: touch ? 96 : 64,
+        minHeight: touch ? 44 : 32,
+        height: touch ? 44 : 32,
+        padding: touch ? "0 14px" : "0 10px",
+        marginBottom: touch ? 0 : undefined,
+        borderRadius: touch ? 12 : "8px 8px 0 0",
+        background: "#5b57d1",
+        color: "#ffffff",
+        WebkitTextFillColor: "#ffffff",
+        fontWeight: 800,
+        fontSize: touch ? 16 : 13,
+        border: "none",
+        cursor: "pointer",
+        boxShadow: "none",
+      };
+    }
+    return {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      minWidth: touch ? 96 : 64,
+      minHeight: touch ? 44 : 32,
+      height: touch ? 44 : 32,
+      padding: touch ? "0 14px" : "0 10px",
+      borderRadius: touch ? 12 : "8px 8px 0 0",
+      background: dark ? "#3a3a44" : "#d0d0d8",
+      color: dark ? "#ffffff" : "#111111",
+      WebkitTextFillColor: dark ? "#ffffff" : "#111111",
+      fontWeight: 700,
+      fontSize: touch ? 16 : 13,
+      border: dark ? "1px solid #555" : "1px solid #999",
+      cursor: "pointer",
+    };
+  }
+
+  const labelStyle = (active: boolean): CSSProperties => ({
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    flex: 1,
+    color: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
+    WebkitTextFillColor: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
+    fontWeight: 800,
+    fontSize: touch ? 16 : 14,
+    lineHeight: 1.2,
+    opacity: 1,
+  });
+
   return (
     <div
-      className={`titlebar ${theme === "dark" ? "titlebar--dark" : ""} ${touch ? "titlebar--touch" : ""}`}
+      className={`titlebar ${dark ? "titlebar--dark" : ""} ${touch ? "titlebar--touch" : ""}`}
+      style={barStyle}
       {...(!touch ? { "data-tauri-drag-region": true } : {})}
       onDoubleClick={(e) => {
         if (touch) return;
@@ -94,10 +164,14 @@ export default function PageTabBar({
     >
       <div className="titlebar__brand no-drag" title="Redraw">
         <img src="/logo.png" alt="" className="titlebar__logo" draggable={false} />
-        <span className="titlebar__name">Redraw</span>
+        {!touch && (
+          <span className="titlebar__name" style={{ color: dark ? "#fff" : "#111", fontWeight: 700 }}>
+            Redraw
+          </span>
+        )}
       </div>
 
-      <div className="titlebar__tabs" role="tablist">
+      <div className="titlebar__tabs" role="tablist" style={{ gap: touch ? 6 : 2 }}>
         {pages.map((page) => {
           const active = page.id === activeId;
           const canDelete = pages.length > 1;
@@ -107,6 +181,7 @@ export default function PageTabBar({
               role="tab"
               aria-selected={active}
               className={`page-tab no-drag ${active ? "page-tab--active" : ""}`}
+              style={tabStyle(active)}
               onClick={() => {
                 if (editingId !== page.id) onSelect(page.id);
               }}
@@ -139,6 +214,18 @@ export default function PageTabBar({
                   value={draft}
                   enterKeyHint="done"
                   autoCapitalize="sentences"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    border: "none",
+                    borderRadius: 4,
+                    padding: "4px 6px",
+                    font: "inherit",
+                    fontWeight: 700,
+                    background: "#fff",
+                    color: "#000",
+                    WebkitTextFillColor: "#000",
+                  }}
                   onChange={(e) => setDraft(e.target.value)}
                   onBlur={commitEdit}
                   onKeyDown={(e) => {
@@ -148,15 +235,7 @@ export default function PageTabBar({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span
-                  className="page-tab__label"
-                  style={{
-                    color: theme === "dark" ? "#ffffff" : "#000000",
-                    WebkitTextFillColor: theme === "dark" ? "#ffffff" : "#000000",
-                    fontWeight: 800,
-                    opacity: 1,
-                  }}
-                >
+                <span className="page-tab__label" style={labelStyle(active)}>
                   {page.name}
                 </span>
               )}
@@ -166,6 +245,23 @@ export default function PageTabBar({
                 title="Delete page"
                 disabled={!canDelete}
                 aria-disabled={!canDelete}
+                style={{
+                  flex: "0 0 auto",
+                  width: touch ? 28 : 18,
+                  height: touch ? 28 : 18,
+                  border: "none",
+                  borderRadius: 4,
+                  background: "transparent",
+                  color: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
+                  WebkitTextFillColor: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
+                  fontSize: touch ? 20 : 14,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  cursor: canDelete ? "pointer" : "default",
+                  opacity: canDelete ? 0.9 : 0,
+                  padding: 0,
+                  pointerEvents: canDelete ? "auto" : "none",
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (canDelete) onDelete(page.id);
@@ -181,6 +277,20 @@ export default function PageTabBar({
           className="titlebar__add no-drag"
           title="New page"
           aria-label="New page"
+          style={{
+            width: touch ? 44 : 28,
+            height: touch ? 44 : 28,
+            border: dark ? "1px solid #555" : "1px solid #999",
+            borderRadius: 10,
+            background: dark ? "#3a3a44" : "#d0d0d8",
+            color: dark ? "#fff" : "#111",
+            WebkitTextFillColor: dark ? "#fff" : "#111",
+            fontSize: touch ? 24 : 18,
+            fontWeight: 800,
+            cursor: "pointer",
+            alignSelf: "center",
+            marginLeft: 4,
+          }}
           onClick={onCreate}
         >
           +
@@ -240,11 +350,7 @@ export default function PageTabBar({
             onClick={() => void win().close().catch(() => {})}
           >
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-              <path
-                d="M1 1l8 8M9 1L1 9"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
+              <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.2" />
             </svg>
           </button>
         </div>

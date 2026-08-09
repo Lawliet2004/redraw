@@ -10,8 +10,15 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light" />
     <title>Redraw</title>
+    <style>
+      /* beat Android WebView force-dark on chrome labels */
+      .page-tab, .page-tab__label, .titlebar__add {
+        color-scheme: only light;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
