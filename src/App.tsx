@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { isTouchUi } from "./platform";
 import type {
   AppState,
   BinaryFiles,
@@ -123,8 +124,13 @@ export default function App() {
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [activeId, setActiveId] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [touch, setTouch] = useState(false);
   const [initialData, setInitialData] =
     useState<ExcalidrawInitialDataState | null>(null);
+
+  useEffect(() => {
+    setTouch(isTouchUi());
+  }, []);
 
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const activeIdRef = useRef("");
@@ -350,7 +356,7 @@ export default function App() {
 
   return (
     <div
-      className={`app-shell ${theme === "dark" ? "app-shell--dark" : ""}`}
+      className={`app-shell ${theme === "dark" ? "app-shell--dark" : ""} ${touch ? "app-shell--touch" : ""}`}
       style={
         theme === "dark"
           ? ({

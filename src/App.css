@@ -283,7 +283,7 @@ body,
   display: none !important;
 }
 
-/* —— mobile / tablet (touch) —— */
+/* —— mobile / tablet: maximize canvas —— */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -296,22 +296,26 @@ body {
 }
 
 .app-shell {
-  /* notches / home indicator */
   padding-top: env(safe-area-inset-top, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.app-shell--touch {
+  /* thinner chrome = more drawing room */
+  --tab-h: 36px;
+}
+
 .titlebar--touch {
   flex: 0 0 auto;
-  min-height: 48px;
+  min-height: var(--tab-h, 36px);
   height: auto;
-  padding: 4px 6px 0;
+  padding: 2px 4px !important;
 }
 
 .titlebar--touch .titlebar__name {
-  display: none; /* logo only — more room for tabs on phones */
+  display: none;
 }
 
 .titlebar--touch .titlebar__tabs {
@@ -320,6 +324,7 @@ body {
   padding-top: 0;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  gap: 4px !important;
 }
 
 .titlebar--touch .titlebar__tabs::-webkit-scrollbar {
@@ -327,83 +332,176 @@ body {
 }
 
 .titlebar--touch .page-tab {
-  min-width: 88px;
-  min-height: 44px;
-  height: 44px;
-  padding: 0 12px;
-  font-size: 15px;
-  border-radius: 10px;
-  border-bottom: none;
-  margin-bottom: 4px;
-  color: #000000 !important;
-  -webkit-text-fill-color: #000000;
-  background: #e8e8ec;
-}
-
-.titlebar--dark.titlebar--touch .page-tab {
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff;
-  background: #3a3a44;
-}
-
-.titlebar--touch .page-tab--active {
-  border-bottom: none;
-  background: #ffffff !important;
-  box-shadow: inset 0 0 0 2px var(--color-primary, #6965db);
-  color: #000000 !important;
-  -webkit-text-fill-color: #000000;
-}
-
-.titlebar--dark.titlebar--touch .page-tab--active {
-  background: #2a2a32 !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff;
+  min-width: 64px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 13px !important;
+  border-radius: 8px !important;
 }
 
 .titlebar--touch .page-tab__label {
-  color: #000000 !important;
-  -webkit-text-fill-color: #000000;
-  font-size: 15px;
+  font-size: 13px !important;
   font-weight: 800;
 }
 
-.titlebar--dark.titlebar--touch .page-tab__label {
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff;
-}
-
 .titlebar--touch .page-tab__close {
-  opacity: 0.55;
-  width: 28px;
-  height: 28px;
-  font-size: 18px;
-  border-radius: 6px;
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 16px !important;
+  opacity: 0.75;
 }
 
 .titlebar--touch .titlebar__add {
-  width: 44px;
-  height: 44px;
-  flex-basis: 44px;
-  font-size: 22px;
-  margin: 0 2px;
+  width: 32px !important;
+  height: 32px !important;
+  flex-basis: 32px !important;
+  font-size: 20px !important;
+  margin: 0 2px !important;
 }
 
 .titlebar--touch .titlebar__logo {
-  width: 36px;
-  height: 36px;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px !important;
 }
 
-/* tablets: keep brand name */
 @media (min-width: 768px) {
   .titlebar--touch .titlebar__name {
     display: inline;
+    font-size: 13px;
   }
 }
 
-/* Excalidraw mobile: slightly larger hit areas via zoom-friendly root */
-@media (pointer: coarse) {
-  .app-shell__canvas .excalidraw {
-    --lg-button-size: 2.5rem;
-    --default-button-size: 2.25rem;
+/* Excalidraw: compact chrome on phone + tablet */
+.app-shell--touch .app-shell__canvas .excalidraw,
+.app-shell--touch .app-shell__canvas .excalidraw.excalidraw--mobile {
+  --lg-button-size: 2rem;
+  --default-button-size: 1.85rem;
+  --default-button-size-mobile: 1.85rem;
+  --space-factor: 0.85;
+}
+
+/* hide tutorial / tip text under tools — pure canvas clutter */
+.app-shell--touch .app-shell__canvas .HintViewer,
+.app-shell--touch .app-shell__canvas .welcome-screen-decor-hint,
+.app-shell--touch .app-shell__canvas .help-icon {
+  display: none !important;
+}
+
+/* top tool strip: tighter */
+.app-shell--touch .app-shell__canvas .App-toolbar,
+.app-shell--touch .app-shell__canvas .App-toolbar--mobile {
+  padding: 2px !important;
+  gap: 0 !important;
+}
+
+.app-shell--touch .app-shell__canvas .App-toolbar-container,
+.app-shell--touch .app-shell__canvas .FixedSideContainer {
+  margin-top: 4px !important;
+}
+
+.app-shell--touch .app-shell__canvas .Island {
+  --padding: 0.35rem !important;
+  padding: 0.3rem !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* bottom mobile bar: smaller, less padding */
+.app-shell--touch .app-shell__canvas .App-bottom-bar,
+.app-shell--touch .app-shell__canvas .App-mobile-menu {
+  padding: 2px 4px !important;
+  margin-bottom: 2px !important;
+}
+
+.app-shell--touch .app-shell__canvas .App-bottom-bar .Island,
+.app-shell--touch .app-shell__canvas .App-mobile-menu .Island {
+  padding: 0.25rem 0.35rem !important;
+}
+
+/* shape properties (stroke/fill panel) — scroll, don't cover canvas */
+.app-shell--touch .app-shell__canvas .selected-shape-actions,
+.app-shell--touch .app-shell__canvas .selected-shape-actions .Island,
+.app-shell--touch .app-shell__canvas .App-menu_top__left > .Island,
+.app-shell--touch .app-shell__canvas .App-menu__left {
+  max-height: min(36vh, 280px) !important;
+  max-width: min(240px, 42vw) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* phone: properties open from bottom bar */
+.app-shell--touch .app-shell__canvas .App-mobile-menu {
+  max-height: min(40vh, 300px) !important;
+  overflow-y: auto !important;
+  margin-bottom: 0 !important;
+  padding-bottom: env(safe-area-inset-bottom, 0) !important;
+}
+
+.app-shell--touch .app-shell__canvas .App-mobile-menu .Island {
+  max-height: min(36vh, 280px) !important;
+  overflow-y: auto !important;
+}
+
+/* smaller color swatches / controls inside panels */
+.app-shell--touch .app-shell__canvas .selected-shape-actions .color-picker__button,
+.app-shell--touch .app-shell__canvas .App-mobile-menu .color-picker__button {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+}
+
+.app-shell--touch .app-shell__canvas .selected-shape-actions fieldset,
+.app-shell--touch .app-shell__canvas .App-mobile-menu fieldset {
+  margin: 0.2rem 0 !important;
+}
+
+/* floating toolbars sit ON canvas, not eating layout */
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper,
+.app-shell--touch .app-shell__canvas .excalidraw .FixedSideContainer {
+  pointer-events: none;
+}
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper .Island,
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper button,
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper label,
+.app-shell--touch .app-shell__canvas .FixedSideContainer .Island,
+.app-shell--touch .app-shell__canvas .FixedSideContainer button,
+.app-shell--touch .app-shell__canvas .App-mobile-menu,
+.app-shell--touch .app-shell__canvas .App-toolbar,
+.app-shell--touch .app-shell__canvas .selected-shape-actions {
+  pointer-events: auto;
+}
+
+/* zoom / undo: smaller corner chips */
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper__footer-left,
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper__footer-right {
+  transform: scale(0.88);
+  transform-origin: bottom left;
+}
+.app-shell--touch .app-shell__canvas .layer-ui__wrapper__footer-right {
+  transform-origin: bottom right;
+}
+
+/* tablet: thin left properties column */
+@media (min-width: 900px) {
+  .app-shell--touch .app-shell__canvas .selected-shape-actions,
+  .app-shell--touch .app-shell__canvas .selected-shape-actions .Island,
+  .app-shell--touch .app-shell__canvas .App-menu_top__left > .Island {
+    max-width: 200px !important;
+    max-height: min(55vh, 420px) !important;
+  }
+
+  .app-shell--touch .app-shell__canvas .App-toolbar-container {
+    margin-top: 2px !important;
+  }
+}
+
+/* phone: keep top tools in one short row */
+@media (max-width: 600px) {
+  .app-shell--touch .app-shell__canvas .App-toolbar,
+  .app-shell--touch .app-shell__canvas .App-toolbar--mobile {
+    max-width: calc(100vw - 12px);
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
   }
 }
