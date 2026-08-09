@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTouchUi } from "../platform";
+import logoUrl from "../assets/logo.png";
 
 export type TabPage = {
   id: string;
@@ -162,8 +163,32 @@ export default function PageTabBar({
         void win().toggleMaximize().catch(() => {});
       }}
     >
-      <div className="titlebar__brand no-drag" title="Redraw">
-        <img src="/logo.png" alt="" className="titlebar__logo" draggable={false} />
+      <div
+        className="titlebar__brand no-drag"
+        title="Redraw"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: touch ? "0 8px 0 4px" : "0 10px 0 12px",
+          flexShrink: 0,
+        }}
+      >
+        <img
+          src={logoUrl}
+          alt="Redraw"
+          className="titlebar__logo"
+          draggable={false}
+          style={{
+            width: touch ? 40 : 30,
+            height: touch ? 40 : 30,
+            borderRadius: 10,
+            objectFit: "cover",
+            display: "block",
+            flexShrink: 0,
+            background: "#111",
+          }}
+        />
         {!touch && (
           <span className="titlebar__name" style={{ color: dark ? "#fff" : "#111", fontWeight: 700 }}>
             Redraw
