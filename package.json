@@ -16,13 +16,16 @@
     "ios:init": "tauri ios init",
     "ios:dev": "tauri ios dev",
     "ios:build": "tauri ios build",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml"
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "node --test scripts/*.test.mjs",
+    "test:ui": "node scripts/workspace.smoke.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-http": "^2.6.0",
     "@tauri-apps/plugin-sql": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

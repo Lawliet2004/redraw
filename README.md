@@ -86,3 +86,27 @@ Workflow: `.github/workflows/release.yml`
 - Data: app local data dir → `canvas.db` (Android: app sandbox)
 - Offline fonts under `public/fonts`
 - App size is mostly `@excalidraw/excalidraw`
+
+## Workspace and AI
+
+- **Settings → Workspace** selects horizontal or vertical tabs, density, system/light/dark theme, and graphite/indigo/forest accents. Vertical tabs support pinning, drag reordering, keyboard-accessible move actions, and a collapsible rail. **Ctrl+K** searches pages and commands. Closing a tab keeps its page.
+- **Settings → Canvas** controls each page’s paper color, plain/dots/grid/ruled pattern, and spacing. Optionally use that paper for new pages. UI theme does not invert drawing colors. **Export image…** exports PNG/SVG with the paper or transparency. Native Excalidraw scene export remains available for compatibility; custom paper metadata is stored in Redraw’s database and is not included in that native file format.
+- **Ctrl+Shift+P** toggles compact properties; **Ctrl+Shift+F** enters focus mode; **Escape** restores the workspace. Stroke presets are 0.5 / 1 / 2 with a numeric override. Advanced properties retain Excalidraw controls.
+- **Ctrl+Enter** opens a general AI prompt. Ask questions, solve problems, explain/rewrite content, create editable diagrams, or create flat illustrations. Illustrations are validated static SVG rendered to PNG; this does not provide photorealistic image-model access. Responses preview before one undoable **Apply to canvas** operation. Source changes invalidate pending results.
+- **Settings → AI** offers Off, Assist, and Auto-answer. Inline suggestions use selected text/handwriting/images after a 650 ms pause. **Tab** accepts, **Escape** dismisses. Auto-answer inserts directly; undo removes it. Ordinary arithmetic runs locally using a bounded parser without executable evaluation. Other requests use your subscription. To watch a defined area, select a rectangle/frame and choose **Use selection as AI area** in the assistant; content inside it becomes the inline context. Clear the area from the same control.
+- Subscription connections are **ChatGPT through Codex App Server** and **Grok through Grok Build ACP** only. Install the official CLI, restart Redraw, open **Settings → AI → ChatGPT and Grok subscriptions**, and choose **Connect in browser**. Refresh status after completing sign-in. Redraw uses separate provider-owned account directories; it never reads tokens or falls back to API keys. Existing legacy API settings are no longer used.
+- Subscription access requires the account’s relevant entitlement and available usage. ChatGPT accepts image selections. The installed Grok ACP reports no image-input capability and displays an actionable error for images. Model lists and account status come from the official clients; Grok does not currently expose equivalent usage reporting.
+- Generation streams from isolated, cancellable official CLI processes with tools disabled, a 120-second overall timeout, and a 45-second response idle timeout. Stop, source changes in inline mode, panel closure, and page switches cancel pending work. Windows process jobs also terminate child helpers. Provider startup, network latency, and model speed remain variable.
+- Connections require desktop CLI availability. Local arithmetic remains usable without a subscription. Live authenticated inference must be verified after the user signs in; automated tests do not spend subscription usage.
+
+Official protocol references: [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Grok Build](https://docs.x.ai/build/overview).
+
+### Verification
+
+```bash
+npm test
+npm run build
+npm run test:rust
+```
+
+The UI smoke test uses an isolated browser session with a fake database module and deterministic AI responses. It does not touch the real canvas database or call a paid provider. Start `npm run dev -- --port 1422`, install Playwright for the test environment (or set `PLAYWRIGHT_PATH` to its installed module), and run `npm run test:ui`. It uses headless Microsoft Edge and saves screenshots in `artifacts/`.

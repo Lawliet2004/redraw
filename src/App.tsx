@@ -11,6 +11,7 @@ import { isTouchUi } from "./platform";
 import type {
   AppState,
   BinaryFiles,
+  LibraryItems,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
@@ -19,6 +20,15 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 import PageTabBar from "./components/PageTabBar";
+import AppSettings from "./components/AppSettings";
+import PagesPanel, { PageList } from "./components/PagesPanel";
+import Dialog from "./components/Dialog";
+import {
+  DEFAULT_PREFERENCES,
+  parsePreferences,
+  type Preferences,
+} from "./preferences";
+import AiBar, { AiSettingsDialog } from "./components/AiBar";
 import {
   bootstrapPages,
   createPage,
@@ -27,11 +37,28 @@ import {
   listPages,
   parseScene,
   renamePage,
+  reorderPages,
   setMeta,
+  getMeta,
   updatePageScene,
   type PageMeta,
   type SceneData,
 } from "./db";
+import { DEFAULT_PAPER, parsePaper, paperImage, type Paper } from "./paper";
+import InlineAssistant from "./components/InlineAssistant";
+import PaperExport from "./components/PaperExport";
+import QuickSwitcher from "./components/QuickSwitcher";
+import AiPanel from "./components/AiPanel";
+import { SaveQueue } from "./saveQueue";
+import {
+  DEFAULT_SUBSCRIPTION,
+  loadSubscription,
+  saveSubscription,
+  type SubscriptionConfig,
+} from "./subscriptions";
+
+const RedrawMenu = lazy(() => import("./components/RedrawMenu"));
+const PropertiesPanel = lazy(() => import("./components/PropertiesPanel"));
 
 const Excalidraw = lazy(async () => {
   await import("@excalidraw/excalidraw/index.css");
@@ -89,6 +116,7 @@ function serializeScene(
   elements: readonly OrderedExcalidrawElement[],
   appState: AppState,
   files: BinaryFiles,
+  paper: Paper,
 ): string {
   const used = new Set<string>();
   for (const el of elements) {
@@ -101,6 +129,7 @@ function serializeScene(
     if (files[id]) filesOut[id] = files[id];
   }
   const scene: SceneData = {
+    paper,
     elements: elements as unknown[],
     appState: persistableAppState(appState),
     files: filesOut as Record<string, unknown>,
@@ -112,6 +141,7 @@ function sceneToInitial(scene: SceneData): ExcalidrawInitialDataState {
   return {
     elements: (scene.elements ?? []) as ExcalidrawInitialDataState["elements"],
     appState: {
+      currentItemStrokeWidth: 1,
       ...(scene.appState as Partial<AppState>),
       collaborators: undefined,
     } as ExcalidrawInitialDataState["appState"],
@@ -120,25 +150,94 @@ function sceneToInitial(scene: SceneData): ExcalidrawInitialDataState {
 }
 
 export default function App() {
+  const [preferences, setPreferences] =
+    useState<Preferences>(DEFAULT_PREFERENCES);
+  const metadataQueue = useRef(new SaveQueue(setMeta));
+  const preferencesRef = useRef(preferences);
+  preferencesRef.current = preferences;
+  const preferenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [paper, setPaper] = useState<Paper>(DEFAULT_PAPER);
+  const paperRef = useRef(paper);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const [exportOpen, setExportOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pagesOpen, setPagesOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
+  const [closedIds, setClosedIdsState] = useState<string[]>([]);
+  const closedIdsRef = useRef<string[]>([]);
+  const setClosedIds = useCallback(
+    (update: string[] | ((ids: string[]) => string[])) => {
+      const next =
+        typeof update === "function" ? update(closedIdsRef.current) : update;
+      closedIdsRef.current = next;
+      setClosedIdsState(next);
+    },
+    [],
+  );
+  const [canvasApi, setCanvasApi] = useState<ExcalidrawImperativeAPI | null>(
+    null,
+  );
+  const [saveError, setSaveError] = useState("");
+  const reportError = useCallback(
+    (e: unknown) =>
+      setSaveError(
+        e instanceof Error
+          ? e.message
+          : "Couldn't save changes. Please try again.",
+      ),
+    [],
+  );
+  const patchPreferences = useCallback(
+    (patch: Partial<Preferences>) => {
+      const next = { ...preferencesRef.current, ...patch };
+      preferencesRef.current = next;
+      setPreferences(next);
+      if (preferenceTimer.current) clearTimeout(preferenceTimer.current);
+      preferenceTimer.current = setTimeout(() => {
+        void metadataQueue.current
+          .save("preferences", JSON.stringify(next))
+          .catch(reportError);
+      }, 250);
+    },
+    [reportError],
+  );
   const [ready, setReady] = useState(false);
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [activeId, setActiveId] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [touch, setTouch] = useState(false);
+  const [libraryItems, setLibraryItems] = useState<LibraryItems>([]);
   const [initialData, setInitialData] =
     useState<ExcalidrawInitialDataState | null>(null);
+  const [llmConfig, setLlmConfig] =
+    useState<SubscriptionConfig>(DEFAULT_SUBSCRIPTION);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
 
   useEffect(() => {
     setTouch(isTouchUi());
   }, []);
 
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const focusCanvas = useCallback(() => {
+    requestAnimationFrame(() =>
+      canvasContainerRef.current
+        ?.querySelector<HTMLElement>(".excalidraw")
+        ?.focus(),
+    );
+  }, []);
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const activeIdRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedRef = useRef("");
-  const dirtyRef = useRef(false);
   const switchingRef = useRef(false);
   const themeRef = useRef<"light" | "dark">("light");
+  const askAi = useCallback(() => setAiOpen(true), []);
+  const waitAi = useCallback(async () => {
+    setAiOpen(false);
+  }, []);
+  const saveQueue = useRef(new SaveQueue(updatePageScene));
 
   const persistIfNeeded = useCallback(async () => {
     const id = activeIdRef.current;
@@ -149,14 +248,10 @@ export default function App() {
       api.getSceneElementsIncludingDeleted() as OrderedExcalidrawElement[],
       api.getAppState(),
       api.getFiles(),
+      paperRef.current,
     );
-    if (payload === lastSavedRef.current) {
-      dirtyRef.current = false;
-      return;
-    }
-    lastSavedRef.current = payload;
-    dirtyRef.current = false;
-    await updatePageScene(id, payload);
+    await saveQueue.current.save(id, payload);
+    setSaveError("");
   }, []);
 
   const flushSave = useCallback(async () => {
@@ -165,14 +260,21 @@ export default function App() {
       saveTimerRef.current = null;
     }
     await persistIfNeeded();
+    if (preferenceTimer.current) {
+      clearTimeout(preferenceTimer.current);
+      preferenceTimer.current = null;
+    }
+    await metadataQueue.current.save(
+      "preferences",
+      JSON.stringify(preferencesRef.current),
+    );
   }, [persistIfNeeded]);
 
   const scheduleSave = useCallback(() => {
-    dirtyRef.current = true;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
-      void persistIfNeeded();
+      void persistIfNeeded().catch(reportError);
     }, SAVE_DEBOUNCE_MS);
   }, [persistIfNeeded]);
 
@@ -191,10 +293,53 @@ export default function App() {
       setPages(all);
       setActiveId(lastId);
       activeIdRef.current = lastId;
-      lastSavedRef.current = activeScene;
       setInitialData(sceneToInitial(parseScene(activeScene)));
+      try {
+        const library = JSON.parse((await getMeta("library_items")) || "[]");
+        if (Array.isArray(library)) setLibraryItems(library);
+      } catch {
+        /* recover malformed library */
+      }
+      const prefs = parsePreferences(await getMeta("preferences"));
+      setPreferences(prefs);
+      const savedScene = parseScene(activeScene);
+      const sheet = parsePaper(
+        savedScene.paper,
+        parsePaper(
+          { color: savedScene.appState?.viewBackgroundColor },
+          prefs.defaultPaper,
+        ),
+      );
+      paperRef.current = sheet;
+      setPaper(sheet);
+      setInitialData({
+        ...sceneToInitial(savedScene),
+        appState: {
+          ...sceneToInitial(savedScene).appState,
+          viewBackgroundColor: "transparent",
+          theme: "light",
+        },
+      });
+      try {
+        const closed = JSON.parse((await getMeta("closed_pages")) || "[]");
+        if (Array.isArray(closed))
+          setClosedIds(
+            closed.filter((id) => typeof id === "string" && id !== lastId),
+          );
+      } catch {
+        /* recover invalid preferences */
+      }
+      let llm = DEFAULT_SUBSCRIPTION;
+      try {
+        llm = await loadSubscription();
+      } catch (e) {
+        reportError(e);
+        setAiSettingsOpen(true);
+      }
+      if (cancelled) return;
+      setLlmConfig(llm);
       setReady(true);
-    })();
+    })().catch(reportError);
     return () => {
       cancelled = true;
     };
@@ -210,8 +355,9 @@ export default function App() {
           event.preventDefault();
           try {
             await flushSave();
-          } finally {
             await win.destroy();
+          } catch (e) {
+            reportError(e);
           }
         });
       } catch {
@@ -227,10 +373,11 @@ export default function App() {
   useEffect(() => {
     if (!ready) return;
     const onVis = () => {
-      if (document.visibilityState === "hidden") void flushSave();
+      if (document.visibilityState === "hidden")
+        void flushSave().catch(reportError);
     };
     const onHide = () => {
-      void flushSave();
+      void flushSave().catch(reportError);
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pagehide", onHide);
@@ -240,60 +387,76 @@ export default function App() {
     };
   }, [ready, flushSave]);
 
-  const loadSceneIntoCanvas = useCallback(
-    (sceneRaw: string) => {
-      const api = apiRef.current;
-      if (!api) return;
-      const scene = parseScene(sceneRaw);
-      switchingRef.current = true;
-      lastSavedRef.current = sceneRaw;
-      dirtyRef.current = false;
-      api.updateScene({
-        elements: (scene.elements ?? []) as OrderedExcalidrawElement[],
-        appState: {
-          ...(scene.appState as object),
-          theme: (scene.appState?.theme as AppState["theme"]) ?? themeRef.current,
-          selectedElementIds: {},
-          selectedGroupIds: {},
-        } as AppState,
-        captureUpdate: CAPTURE_NEVER,
-      });
-      api.history.clear();
-      const files = (scene.files ?? {}) as BinaryFiles;
-      const fileList = Object.values(files);
-      if (fileList.length) {
-        api.addFiles(fileList);
-      }
-      queueMicrotask(() => {
-        switchingRef.current = false;
-      });
-    },
-    [],
-  );
+  const loadSceneIntoCanvas = useCallback((sceneRaw: string) => {
+    const api = apiRef.current;
+    if (!api) return;
+    const scene = parseScene(sceneRaw);
+    const sheet = parsePaper(
+      scene.paper,
+      parsePaper(
+        { color: scene.appState?.viewBackgroundColor },
+        preferencesRef.current.defaultPaper,
+      ),
+    );
+    paperRef.current = sheet;
+    setPaper(sheet);
+    switchingRef.current = true;
+    api.updateScene({
+      elements: (scene.elements ?? []) as OrderedExcalidrawElement[],
+      appState: {
+        currentItemStrokeWidth: 1,
+        ...(scene.appState as object),
+        viewBackgroundColor: "transparent",
+        theme: "light",
+        selectedElementIds: {},
+        selectedGroupIds: {},
+      } as AppState,
+      captureUpdate: CAPTURE_NEVER,
+    });
+    api.history.clear();
+    const files = (scene.files ?? {}) as BinaryFiles;
+    const fileList = Object.values(files);
+    if (fileList.length) {
+      api.addFiles(fileList);
+    }
+    queueMicrotask(() => {
+      switchingRef.current = false;
+    });
+  }, []);
 
   const handleSelect = useCallback(
     async (id: string) => {
+      if (!(await listPages()).some((page) => page.id === id)) return;
+      setClosedIds((ids) => ids.filter((closed) => closed !== id));
       if (id === activeIdRef.current) return;
+      await waitAi();
       await flushSave();
       const sceneRaw = await getPageScene(id);
       setActiveId(id);
       activeIdRef.current = id;
-      void setMeta("last_active_page_id", id);
+      void metadataQueue.current
+        .save("last_active_page_id", id)
+        .catch(reportError);
       loadSceneIntoCanvas(sceneRaw);
     },
-    [flushSave, loadSceneIntoCanvas],
+    [flushSave, loadSceneIntoCanvas, waitAi],
   );
 
   const handleCreate = useCallback(async () => {
+    await waitAi();
     await flushSave();
     const count = (await listPages()).length;
     const page = await createPage(`P${count + 1}`);
     setPages((prev) => [...prev, page]);
     setActiveId(page.id);
     activeIdRef.current = page.id;
-    void setMeta("last_active_page_id", page.id);
-    loadSceneIntoCanvas(JSON.stringify({ elements: [], appState: {}, files: {} }));
-  }, [flushSave, loadSceneIntoCanvas]);
+    void metadataQueue.current
+      .save("last_active_page_id", page.id)
+      .catch(reportError);
+    loadSceneIntoCanvas(
+      JSON.stringify({ elements: [], appState: {}, files: {} }),
+    );
+  }, [flushSave, loadSceneIntoCanvas, waitAi]);
 
   const handleRename = useCallback(async (id: string, name: string) => {
     await renamePage(id, name);
@@ -302,32 +465,54 @@ export default function App() {
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (pages.length <= 1) return;
-      const page = pages.find((p) => p.id === id);
+      const currentPages = await listPages();
+      if (currentPages.length <= 1 || !currentPages.some((p) => p.id === id))
+        return;
+      const page = currentPages.find((p) => p.id === id);
       const ok = await ask(
         `Delete "${page?.name ?? "this page"}"? This cannot be undone.`,
         { title: "Delete page", kind: "warning" },
       );
       if (!ok) return;
 
-      const remaining = pages.filter((p) => p.id !== id);
+      const remaining = currentPages.filter((p) => p.id !== id);
       const wasActive = id === activeIdRef.current;
       if (wasActive) {
+        await waitAi();
         await flushSave();
       }
       await deletePage(id);
       setPages(remaining);
       if (wasActive) {
         const next = remaining[0];
+        setClosedIds((ids) =>
+          ids.filter((closed) => closed !== next.id && closed !== id),
+        );
         setActiveId(next.id);
         activeIdRef.current = next.id;
-        void setMeta("last_active_page_id", next.id);
+        void metadataQueue.current
+          .save("last_active_page_id", next.id)
+          .catch(reportError);
         const sceneRaw = await getPageScene(next.id);
         loadSceneIntoCanvas(sceneRaw);
       }
     },
-    [flushSave, loadSceneIntoCanvas, pages],
+    [flushSave, loadSceneIntoCanvas, pages, waitAi],
   );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== "Enter") return;
+      if (e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, [contenteditable=true]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void askAi();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [askAi]);
 
   const onChange = useCallback(
     (
@@ -335,28 +520,183 @@ export default function App() {
       appState: AppState,
       _files: BinaryFiles,
     ) => {
-      if (appState.theme === "light" || appState.theme === "dark") {
-        if (appState.theme !== themeRef.current) {
-          themeRef.current = appState.theme;
-          setTheme(appState.theme);
-          void setMeta("theme", appState.theme);
-        }
-      }
+      setViewport((old) =>
+        old.x === appState.scrollX &&
+        old.y === appState.scrollY &&
+        old.zoom === appState.zoom.value
+          ? old
+          : {
+              x: appState.scrollX,
+              y: appState.scrollY,
+              zoom: appState.zoom.value,
+            },
+      );
       if (switchingRef.current) return;
+      if (
+        appState.viewBackgroundColor !== "transparent" &&
+        /^#[\da-f]{6}$/i.test(appState.viewBackgroundColor)
+      ) {
+        const next = {
+          ...paperRef.current,
+          color: appState.viewBackgroundColor,
+        };
+        paperRef.current = next;
+        setPaper(next);
+        queueMicrotask(() =>
+          apiRef.current?.updateScene({
+            appState: { viewBackgroundColor: "transparent" },
+            captureUpdate: CAPTURE_NEVER,
+          }),
+        );
+      }
       scheduleSave();
     },
     [scheduleSave],
   );
 
+  useEffect(() => {
+    if (ready)
+      void metadataQueue.current
+        .save("closed_pages", JSON.stringify(closedIds))
+        .catch(reportError);
+  }, [closedIds, ready, reportError]);
+
+  const closePage = async (id: string) => {
+    const currentPages = await listPages();
+    const open = currentPages.filter(
+      (p) => !closedIdsRef.current.includes(p.id) && p.id !== id,
+    );
+    if (!open.length) {
+      setPagesOpen(true);
+      return;
+    }
+    if (id === activeIdRef.current) await handleSelect(open[0].id);
+    setClosedIds((ids) => [...new Set([...ids, id])]);
+  };
+
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (
+        (e.target as HTMLElement)?.closest(
+          "input, textarea, [contenteditable=true], dialog",
+        )
+      )
+        return;
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "p"
+      ) {
+        e.preventDefault();
+        patchPreferences({
+          propertiesVisible: !preferencesRef.current.propertiesVisible,
+        });
+      }
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "f"
+      ) {
+        e.preventDefault();
+        setFocusMode((v) => !v);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        e.stopPropagation();
+        setQuickOpen(true);
+      }
+      if (e.key === "Escape") setFocusMode(false);
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, [patchPreferences]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => {
+      const t =
+        preferences.appTheme === "system"
+          ? media.matches
+            ? "dark"
+            : "light"
+          : preferences.appTheme;
+      themeRef.current = t;
+      setTheme(t);
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [preferences.appTheme, ready]);
+  const navigationQueue = useRef<Promise<void>>(Promise.resolve());
+  const navigate = (operation: () => Promise<void>) => {
+    const job = navigationQueue.current.then(operation);
+    navigationQueue.current = job.catch(reportError);
+  };
+  const reorder = (from: string, to: string) =>
+    navigate(async () => {
+      const current = await listPages();
+      const a = current.findIndex((p) => p.id === from),
+        b = current.findIndex((p) => p.id === to);
+      if (a < 0 || b < 0 || a === b) return;
+      const [moved] = current.splice(a, 1);
+      current.splice(b, 0, moved);
+      await reorderPages(current.map((p) => p.id));
+      setPages(current);
+    });
+  const pageProps = {
+    pinnedIds: preferences.pinnedPages,
+    onPin: (id: string) =>
+      patchPreferences({
+        pinnedPages: preferences.pinnedPages.includes(id)
+          ? preferences.pinnedPages.filter((p) => p !== id)
+          : [...preferences.pinnedPages, id],
+      }),
+    onReorder: reorder,
+    onMove: (id: string, direction: number) => {
+      const index = pages.findIndex((p) => p.id === id);
+      if (pages[index + direction]) reorder(id, pages[index + direction].id);
+    },
+    pages,
+    activeId,
+    closedIds,
+    onSelect: (id: string) => {
+      navigate(async () => {
+        await handleSelect(id);
+        setPagesOpen(false);
+      });
+    },
+    onCreate: () => {
+      navigate(handleCreate);
+    },
+    onRename: handleRename,
+    onDelete: (id: string) => {
+      navigate(() => handleDelete(id));
+    },
+    onClosePage: (id: string) => {
+      navigate(() => closePage(id));
+    },
+  };
   const activePage = pages.find((p) => p.id === activeId);
 
   if (!ready || !initialData) {
-    return <div className="app-loading">Loading…</div>;
+    return (
+      <div className="app-loading">
+        {saveError ? (
+          <div role="alert">
+            {saveError}
+            <button onClick={() => window.location.reload()}>Retry</button>
+          </div>
+        ) : (
+          "Loading…"
+        )}
+      </div>
+    );
   }
 
   return (
     <div
-      className={`app-shell ${theme === "dark" ? "app-shell--dark" : ""} ${touch ? "app-shell--touch" : ""}`}
+      className={`app-shell palette-${preferences.palette} density-${preferences.density} ${focusMode ? "is-focused" : ""} ${advanced && preferences.propertiesVisible ? "show-advanced" : ""} ${theme === "dark" ? "app-shell--dark" : ""} ${touch ? "app-shell--touch" : ""}`}
       style={
         theme === "dark"
           ? ({
@@ -370,40 +710,254 @@ export default function App() {
       }
     >
       <PageTabBar
-        pages={pages}
+        pages={[...pages]
+          .sort(
+            (a, b) =>
+              Number(preferences.pinnedPages.includes(b.id)) -
+              Number(preferences.pinnedPages.includes(a.id)),
+          )
+          .filter((p) => !closedIds.includes(p.id))}
+        vertical={preferences.tabLayout === "vertical"}
+        onPages={() => setQuickOpen(true)}
         activeId={activeId}
         theme={theme}
-        onSelect={(id) => void handleSelect(id)}
-        onCreate={() => void handleCreate()}
-        onRename={(id, name) => void handleRename(id, name)}
-        onDelete={(id) => void handleDelete(id)}
+        onSelect={pageProps.onSelect}
+        onCreate={pageProps.onCreate}
+        onRename={(id, name) => {
+          void handleRename(id, name).catch(reportError);
+        }}
+        onClosePage={pageProps.onClosePage}
       />
-      <div className="app-shell__canvas">
-        <Suspense fallback={<div className="app-loading">Loading canvas…</div>}>
-          <Excalidraw
-            excalidrawAPI={(api) => {
-              apiRef.current = api;
-            }}
-            initialData={initialData}
-            theme={theme}
-            name={activePage?.name ?? "Page"}
-            aiEnabled={false}
-            UIOptions={{
-              canvasActions: {
-                loadScene: false,
-                saveToActiveFile: false,
-                export: { saveFileToDisk: true },
-                saveAsImage: true,
-                toggleTheme: true,
-                clearCanvas: true,
-              },
-              tools: { image: true },
-              welcomeScreen: false,
-            }}
-            onChange={onChange}
+      <div className="workspace-body">
+        {preferences.tabLayout === "vertical" && !focusMode && (
+          <PagesPanel
+            {...pageProps}
+            preferences={preferences}
+            onPreferences={patchPreferences}
           />
-        </Suspense>
+        )}
+        <div className="app-shell__canvas" ref={canvasContainerRef}>
+          <div
+            className="paper-background"
+            aria-hidden="true"
+            style={{
+              backgroundColor: paper.color,
+              backgroundImage:
+                paper.pattern === "plain" ? undefined : paperImage(paper),
+              backgroundSize: `${paper.spacing * viewport.zoom}px ${paper.spacing * viewport.zoom}px`,
+              backgroundPosition: `${viewport.x * viewport.zoom}px ${viewport.y * viewport.zoom}px`,
+            }}
+          />
+          {!focusMode && (
+            <div className="workspace-ai-tools">
+              <AiBar
+                busy={false}
+                theme={theme}
+                onAsk={askAi}
+                onStop={() => setAiOpen(false)}
+                onSettings={() => setSettingsOpen(true)}
+              />
+            </div>
+          )}
+          <div className="workspace-tools">
+            <button
+              aria-pressed={preferences.propertiesVisible && !focusMode}
+              onClick={() => {
+                if (focusMode) setFocusMode(false);
+                else
+                  patchPreferences({
+                    propertiesVisible: !preferences.propertiesVisible,
+                  });
+              }}
+            >
+              {focusMode
+                ? "Exit focus"
+                : preferences.propertiesVisible
+                  ? "Hide properties"
+                  : "Properties"}
+            </button>
+            {!focusMode && (
+              <button
+                title="Focus mode (Ctrl+Shift+F)"
+                onClick={() => setFocusMode(true)}
+              >
+                Focus
+              </button>
+            )}
+          </div>
+          {saveError && (
+            <div className="save-error" role="alert">
+              {saveError}
+              <button
+                onClick={() => {
+                  void flushSave().catch(reportError);
+                }}
+              >
+                Retry save
+              </button>
+            </div>
+          )}
+          {!focusMode &&
+            preferences.propertiesVisible &&
+            !advanced &&
+            canvasApi && (
+              <Suspense fallback={null}>
+                <PropertiesPanel
+                  api={canvasApi}
+                  onHide={() => patchPreferences({ propertiesVisible: false })}
+                  onAdvanced={() => setAdvanced(true)}
+                />
+              </Suspense>
+            )}
+          {advanced && preferences.propertiesVisible && !focusMode && (
+            <button
+              className="advanced-back"
+              onClick={() => setAdvanced(false)}
+            >
+              ← Compact properties
+            </button>
+          )}
+          <Suspense
+            fallback={<div className="app-loading">Loading canvas…</div>}
+          >
+            <Excalidraw
+              excalidrawAPI={(api) => {
+                apiRef.current = api;
+                setCanvasApi(api);
+              }}
+              initialData={{ ...initialData, libraryItems }}
+              onLibraryChange={(items) => {
+                void metadataQueue.current
+                  .save("library_items", JSON.stringify(items))
+                  .catch(reportError);
+              }}
+              theme="light"
+              name={activePage?.name ?? "Page"}
+              aiEnabled={false}
+              zenModeEnabled={focusMode}
+              UIOptions={{
+                canvasActions: {
+                  loadScene: false,
+                  saveToActiveFile: false,
+                  export: { saveFileToDisk: true },
+                  saveAsImage: true,
+                  toggleTheme: true,
+                  clearCanvas: true,
+                },
+                tools: { image: true },
+                welcomeScreen: false,
+              }}
+              onChange={onChange}
+            >
+              <RedrawMenu
+                onExport={() => setExportOpen(true)}
+                onTheme={() =>
+                  patchPreferences({
+                    appTheme: theme === "dark" ? "light" : "dark",
+                  })
+                }
+                onSettings={() => setSettingsOpen(true)}
+                onPages={() => setPagesOpen(true)}
+                onFocus={() => setFocusMode((v) => !v)}
+              />
+            </Excalidraw>
+          </Suspense>
+          {canvasApi && (
+            <InlineAssistant
+              key={`inline-${activeId}`}
+              api={canvasApi}
+              config={llmConfig}
+              paperColor={paper.color}
+              mode={preferences.aiMode}
+              disabled={aiOpen || settingsOpen || aiSettingsOpen || focusMode}
+              onSettings={() => setAiSettingsOpen(true)}
+            />
+          )}
+          {aiOpen && canvasApi && !focusMode && (
+            <AiPanel
+              key={activeId}
+              api={canvasApi}
+              config={llmConfig}
+              paperColor={paper.color}
+              onClose={() => {
+                setAiOpen(false);
+                focusCanvas();
+              }}
+              onApplied={focusCanvas}
+              onSettings={() => setAiSettingsOpen(true)}
+            />
+          )}
+        </div>
       </div>
+      {exportOpen && canvasApi && (
+        <PaperExport
+          api={canvasApi}
+          paper={paper}
+          name={activePage?.name || "Page"}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
+      {quickOpen && (
+        <QuickSwitcher
+          pages={pages}
+          onClose={() => setQuickOpen(false)}
+          onSelect={pageProps.onSelect}
+          commands={[
+            { name: "New page", run: pageProps.onCreate },
+            { name: "All pages", run: () => setPagesOpen(true) },
+            { name: "Settings", run: () => setSettingsOpen(true) },
+            { name: "Focus mode", run: () => setFocusMode((v) => !v) },
+            { name: "AI assistant", run: askAi },
+            {
+              name: "Toggle vertical tabs",
+              run: () =>
+                patchPreferences({
+                  tabLayout:
+                    preferences.tabLayout === "vertical"
+                      ? "horizontal"
+                      : "vertical",
+                }),
+            },
+          ]}
+        />
+      )}
+      {pagesOpen && (
+        <Dialog title="All pages" onClose={() => setPagesOpen(false)}>
+          <PageList {...pageProps} />
+        </Dialog>
+      )}
+      {settingsOpen && (
+        <AppSettings
+          preferences={preferences}
+          paper={paper}
+          onClose={() => setSettingsOpen(false)}
+          onAiSettings={() => {
+            setSettingsOpen(false);
+            setAiSettingsOpen(true);
+          }}
+          onSave={async (p, sheet) => {
+            if (preferenceTimer.current) clearTimeout(preferenceTimer.current);
+            await metadataQueue.current.save("preferences", JSON.stringify(p));
+            preferencesRef.current = p;
+            setPreferences(p);
+            paperRef.current = sheet;
+            setPaper(sheet);
+            await persistIfNeeded();
+          }}
+        />
+      )}
+      {aiSettingsOpen && (
+        <AiSettingsDialog
+          config={llmConfig}
+          theme={theme}
+          onClose={() => setAiSettingsOpen(false)}
+          onSave={async (c) => {
+            await saveSubscription(c);
+            setLlmConfig(c);
+            setAiSettingsOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

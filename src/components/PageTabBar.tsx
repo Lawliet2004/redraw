@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTouchUi } from "../platform";
 import logoUrl from "../assets/logo.png";
@@ -12,20 +12,24 @@ type Props = {
   pages: TabPage[];
   activeId: string;
   theme: "light" | "dark";
+  vertical?: boolean;
+  onPages: () => void;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onRename: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
+  onClosePage: (id: string) => void;
 };
 
 export default function PageTabBar({
   pages,
   activeId,
   theme,
+  vertical = false,
+  onPages,
   onSelect,
   onCreate,
   onRename,
-  onDelete,
+  onClosePage,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -48,12 +52,19 @@ export default function PageTabBar({
 
   useEffect(() => {
     if (touch) return;
+    if (!("__TAURI_INTERNALS__" in window)) return;
     const win = getCurrentWindow();
     let unlisten: (() => void) | undefined;
-    void win.isMaximized().then(setMaximized).catch(() => {});
+    void win
+      .isMaximized()
+      .then(setMaximized)
+      .catch(() => {});
     void win
       .onResized(() => {
-        void win.isMaximized().then(setMaximized).catch(() => {});
+        void win
+          .isMaximized()
+          .then(setMaximized)
+          .catch(() => {});
       })
       .then((fn) => {
         unlisten = fn;
@@ -83,119 +94,40 @@ export default function PageTabBar({
 
   const win = () => getCurrentWindow();
 
-  // Solid fills + white/black only — survives Android WebView force-dark
-  const barStyle: CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    flex: "0 0 auto",
-    minHeight: touch ? 36 : 40,
-    background: dark ? "#1e1e24" : "#e8e8ee",
-    borderBottom: dark ? "1px solid #333" : "1px solid #c8c8d0",
-    color: dark ? "#fff" : "#111",
-    zIndex: 10,
-    userSelect: "none",
-    padding: touch ? "2px 4px" : "0",
-  };
-
-  function tabStyle(active: boolean): CSSProperties {
-    if (active) {
-      return {
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        minWidth: touch ? 72 : 64,
-        minHeight: touch ? 32 : 32,
-        height: touch ? 32 : 32,
-        padding: touch ? "0 10px" : "0 10px",
-        borderRadius: touch ? 8 : "8px 8px 0 0",
-        background: "#5b57d1",
-        color: "#ffffff",
-        WebkitTextFillColor: "#ffffff",
-        fontWeight: 800,
-        fontSize: touch ? 13 : 13,
-        border: "none",
-        cursor: "pointer",
-        boxShadow: "none",
-      };
-    }
-    return {
-      display: "flex",
-      alignItems: "center",
-      gap: 4,
-      minWidth: touch ? 72 : 64,
-      minHeight: touch ? 32 : 32,
-      height: touch ? 32 : 32,
-      padding: touch ? "0 10px" : "0 10px",
-      borderRadius: touch ? 8 : "8px 8px 0 0",
-      background: dark ? "#3a3a44" : "#d0d0d8",
-      color: dark ? "#ffffff" : "#111111",
-      WebkitTextFillColor: dark ? "#ffffff" : "#111111",
-      fontWeight: 700,
-      fontSize: touch ? 13 : 13,
-      border: dark ? "1px solid #555" : "1px solid #999",
-      cursor: "pointer",
-    };
-  }
-
-  const labelStyle = (active: boolean): CSSProperties => ({
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    flex: 1,
-    color: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
-    WebkitTextFillColor: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
-    fontWeight: 800,
-    fontSize: touch ? 13 : 14,
-    lineHeight: 1.2,
-    opacity: 1,
-  });
-
   return (
     <div
-      className={`titlebar ${dark ? "titlebar--dark" : ""} ${touch ? "titlebar--touch" : ""}`}
-      style={barStyle}
+      className={`titlebar ${vertical ? "titlebar--vertical" : ""} ${dark ? "titlebar--dark" : ""} ${touch ? "titlebar--touch" : ""}`}
       {...(!touch ? { "data-tauri-drag-region": true } : {})}
       onDoubleClick={(e) => {
         if (touch) return;
         const t = e.target as HTMLElement;
         if (t.closest(".no-drag")) return;
-        void win().toggleMaximize().catch(() => {});
+        void win()
+          .toggleMaximize()
+          .catch(() => {});
       }}
     >
-      <div
-        className="titlebar__brand no-drag"
-        title="Redraw"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: touch ? "0 8px 0 4px" : "0 10px 0 12px",
-          flexShrink: 0,
-        }}
-      >
-        <img
-          src={logoUrl}
-          alt="Redraw"
-          className="titlebar__logo"
-          draggable={false}
-          style={{
-            width: touch ? 28 : 30,
-            height: touch ? 28 : 30,
-            borderRadius: 8,
-            objectFit: "cover",
-            display: "block",
-            flexShrink: 0,
-            background: "#111",
-          }}
-        />
-        {!touch && (
-          <span className="titlebar__name" style={{ color: dark ? "#fff" : "#111", fontWeight: 700 }}>
-            Redraw
-          </span>
-        )}
+      <div className="titlebar__brand no-drag" title="Redraw">
+        <span className="titlebar__logo-wrap">
+          <img
+            src={logoUrl}
+            alt="Redraw"
+            className="titlebar__logo"
+            draggable={false}
+          />
+        </span>
+        {!touch && <span className="titlebar__name">Redraw</span>}
       </div>
 
-      <div className="titlebar__tabs" role="tablist" style={{ gap: touch ? 6 : 2 }}>
+      <button
+        className="icon-button no-drag all-pages-button"
+        title="All pages"
+        aria-label="All pages"
+        onClick={onPages}
+      >
+        ▤
+      </button>
+      <div className="titlebar__tabs" role="tablist" aria-label="Open pages">
         {pages.map((page) => {
           const active = page.id === activeId;
           const canDelete = pages.length > 1;
@@ -204,8 +136,33 @@ export default function PageTabBar({
               key={page.id}
               role="tab"
               aria-selected={active}
+              tabIndex={active ? 0 : -1}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                const index = pages.findIndex((p) => p.id === page.id);
+                const next =
+                  e.key === "ArrowRight"
+                    ? (index + 1) % pages.length
+                    : e.key === "ArrowLeft"
+                      ? (index - 1 + pages.length) % pages.length
+                      : e.key === "Home"
+                        ? 0
+                        : e.key === "End"
+                          ? pages.length - 1
+                          : -1;
+                if (next >= 0) {
+                  e.preventDefault();
+                  onSelect(pages[next].id);
+                  e.currentTarget.parentElement
+                    ?.querySelectorAll<HTMLElement>('[role="tab"]')
+                    [next]?.focus();
+                }
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(page.id);
+                }
+              }}
               className={`page-tab no-drag ${active ? "page-tab--active" : ""}`}
-              style={tabStyle(active)}
               onClick={() => {
                 if (editingId !== page.id) onSelect(page.id);
               }}
@@ -231,6 +188,12 @@ export default function PageTabBar({
               onTouchMove={clearLongPress}
               onTouchCancel={clearLongPress}
             >
+              <img
+                src={logoUrl}
+                alt=""
+                className="page-tab__icon"
+                draggable={false}
+              />
               {editingId === page.id ? (
                 <input
                   ref={inputRef}
@@ -238,18 +201,6 @@ export default function PageTabBar({
                   value={draft}
                   enterKeyHint="done"
                   autoCapitalize="sentences"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    border: "none",
-                    borderRadius: 4,
-                    padding: "4px 6px",
-                    font: "inherit",
-                    fontWeight: 700,
-                    background: "#fff",
-                    color: "#000",
-                    WebkitTextFillColor: "#000",
-                  }}
                   onChange={(e) => setDraft(e.target.value)}
                   onBlur={commitEdit}
                   onKeyDown={(e) => {
@@ -259,36 +210,18 @@ export default function PageTabBar({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="page-tab__label" style={labelStyle(active)}>
-                  {page.name}
-                </span>
+                <span className="page-tab__label">{page.name}</span>
               )}
               <button
                 type="button"
                 className="page-tab__close"
-                title="Delete page"
+                title="Close tab"
+                aria-label={`Close ${page.name}`}
                 disabled={!canDelete}
                 aria-disabled={!canDelete}
-                style={{
-                  flex: "0 0 auto",
-                  width: touch ? 22 : 18,
-                  height: touch ? 22 : 18,
-                  border: "none",
-                  borderRadius: 4,
-                  background: "transparent",
-                  color: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
-                  WebkitTextFillColor: active ? "#ffffff" : dark ? "#ffffff" : "#111111",
-                  fontSize: touch ? 16 : 14,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  cursor: canDelete ? "pointer" : "default",
-                  opacity: canDelete ? 0.9 : 0,
-                  padding: 0,
-                  pointerEvents: canDelete ? "auto" : "none",
-                }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (canDelete) onDelete(page.id);
+                  if (canDelete) onClosePage(page.id);
                 }}
               >
                 ×
@@ -301,27 +234,16 @@ export default function PageTabBar({
           className="titlebar__add no-drag"
           title="New page"
           aria-label="New page"
-          style={{
-            width: touch ? 32 : 28,
-            height: touch ? 32 : 28,
-            border: dark ? "1px solid #555" : "1px solid #999",
-            borderRadius: 8,
-            background: dark ? "#3a3a44" : "#d0d0d8",
-            color: dark ? "#fff" : "#111",
-            WebkitTextFillColor: dark ? "#fff" : "#111",
-            fontSize: touch ? 20 : 18,
-            fontWeight: 800,
-            cursor: "pointer",
-            alignSelf: "center",
-            marginLeft: 4,
-          }}
           onClick={onCreate}
         >
           +
         </button>
       </div>
 
-      <div className="titlebar__spacer" {...(!touch ? { "data-tauri-drag-region": true } : {})} />
+      <div
+        className="titlebar__spacer"
+        {...(!touch ? { "data-tauri-drag-region": true } : {})}
+      />
 
       {!touch && (
         <div className="titlebar__controls no-drag">
@@ -330,7 +252,11 @@ export default function PageTabBar({
             className="win-btn"
             title="Minimize"
             aria-label="Minimize"
-            onClick={() => void win().minimize().catch(() => {})}
+            onClick={() =>
+              void win()
+                .minimize()
+                .catch(() => {})
+            }
           >
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
               <path d="M0 5h10" stroke="currentColor" strokeWidth="1.2" />
@@ -341,7 +267,11 @@ export default function PageTabBar({
             className="win-btn"
             title={maximized ? "Restore" : "Maximize"}
             aria-label={maximized ? "Restore" : "Maximize"}
-            onClick={() => void win().toggleMaximize().catch(() => {})}
+            onClick={() =>
+              void win()
+                .toggleMaximize()
+                .catch(() => {})
+            }
           >
             {maximized ? (
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
@@ -371,10 +301,18 @@ export default function PageTabBar({
             className="win-btn win-btn--close"
             title="Close"
             aria-label="Close"
-            onClick={() => void win().close().catch(() => {})}
+            onClick={() =>
+              void win()
+                .close()
+                .catch(() => {})
+            }
           >
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-              <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.2" />
+              <path
+                d="M1 1l8 8M9 1L1 9"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
             </svg>
           </button>
         </div>

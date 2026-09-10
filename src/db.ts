@@ -1,3 +1,4 @@
+import { parsePaper, type Paper } from "./paper";
 import Database from "@tauri-apps/plugin-sql";
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
 import { mkdir, BaseDirectory } from "@tauri-apps/plugin-fs";
@@ -12,6 +13,7 @@ export type PageMeta = {
 };
 
 export type SceneData = {
+  paper?: Paper;
   elements: unknown[];
   appState: Record<string, unknown>;
   files?: Record<string, unknown>;
@@ -160,6 +162,7 @@ export function parseScene(raw: string): SceneData {
   try {
     const data = JSON.parse(raw) as SceneData;
     return {
+      paper: data.paper ? parsePaper(data.paper) : undefined,
       elements: Array.isArray(data.elements) ? data.elements : [],
       appState:
         data.appState && typeof data.appState === "object" ? data.appState : {},
@@ -168,4 +171,22 @@ export function parseScene(raw: string): SceneData {
   } catch {
     return emptyScene();
   }
+}
+
+export async function reorderPages(ids: string[]): Promise<void> {
+  const existing = await listPages();
+  if (
+    new Set(ids).size !== ids.length ||
+    ids.length !== existing.length ||
+    existing.some((page) => !ids.includes(page.id))
+  )
+    throw new Error("Page list changed. Try reordering again.");
+  // One statement keeps tab order atomic even when persistence fails.
+  const cases = ids
+    .map((_, index) => `WHEN $${index + 1} THEN ${index}`)
+    .join(" ");
+  await requireDb().execute(
+    `UPDATE pages SET position = CASE id ${cases} ELSE position END`,
+    ids,
+  );
 }
