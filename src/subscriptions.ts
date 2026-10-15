@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getMeta, setMeta } from "./db";
+import { isMobileOS } from "./platform";
 
-export type SubscriptionProvider = "chatgpt" | "grok";
+export type CliProvider = "chatgpt" | "grok";
+export type SubscriptionProvider = CliProvider | "api";
 export type SubscriptionConfig = {
   provider: SubscriptionProvider;
   model: string;
@@ -18,15 +20,25 @@ export const DEFAULT_SUBSCRIPTION: SubscriptionConfig = {
   provider: "chatgpt",
   model: "",
 };
+export function providerLabel(provider: SubscriptionProvider): string {
+  if (provider === "chatgpt") return "ChatGPT";
+  if (provider === "grok") return "Grok";
+  return "API key";
+}
+function coerceProvider(value: unknown): SubscriptionProvider {
+  if (isMobileOS()) return "api";
+  if (value === "grok" || value === "api") return value;
+  return "chatgpt";
+}
 export async function loadSubscription(): Promise<SubscriptionConfig> {
   try {
     const value = JSON.parse((await getMeta("subscription_config")) || "{}");
     return {
-      provider: value.provider === "grok" ? "grok" : "chatgpt",
+      provider: coerceProvider(value.provider),
       model: typeof value.model === "string" ? value.model : "",
     };
   } catch {
-    return DEFAULT_SUBSCRIPTION;
+    return { provider: coerceProvider(undefined), model: "" };
   }
 }
 export async function saveSubscription(
@@ -35,7 +47,7 @@ export async function saveSubscription(
   await setMeta("subscription_config", JSON.stringify(config));
 }
 export async function subscriptionStatus(
-  provider: SubscriptionProvider,
+  provider: CliProvider,
 ): Promise<SubscriptionStatus> {
   if (!("__TAURI_INTERNALS__" in window))
     return {
@@ -46,13 +58,11 @@ export async function subscriptionStatus(
   return invoke("subscription_status", { provider });
 }
 export async function subscriptionLogin(
-  provider: SubscriptionProvider,
+  provider: CliProvider,
 ): Promise<{ url?: string; message: string }> {
   return invoke("subscription_login", { provider });
 }
-export async function subscriptionLogout(
-  provider: SubscriptionProvider,
-): Promise<void> {
+export async function subscriptionLogout(provider: CliProvider): Promise<void> {
   return invoke("subscription_logout", { provider });
 }
 export async function streamSubscription(opts: {

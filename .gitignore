@@ -25,3 +25,4 @@ dist-ssr
 
 # Local browser verification screenshots
 artifacts/
+scripts/.smartink.bundle.mjs

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { IconClose } from "./icons";
 
 export default function Dialog({
   title,
@@ -47,7 +48,7 @@ export default function Dialog({
           aria-label="Close dialog"
           onClick={onClose}
         >
-          ×
+          <IconClose />
         </button>
       </header>
       {children}

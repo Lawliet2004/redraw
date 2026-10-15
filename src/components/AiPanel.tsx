@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { generateAi, type AiAction, type AiResult } from "../ai";
-import type { SubscriptionConfig } from "../subscriptions";
+import { providerLabel, type SubscriptionConfig } from "../subscriptions";
+import { IconClose } from "./icons";
 
 export default function AiPanel({
   api,
@@ -123,8 +124,8 @@ export default function AiPanel({
           <h2>AI assistant</h2>
           <span className="selection-caption">
             {selectionCount
-              ? `${selectionCount} selected · ${config.provider === "chatgpt" ? "ChatGPT" : "Grok"}`
-              : `Ask anything · ${config.provider === "chatgpt" ? "ChatGPT" : "Grok"}`}
+              ? `${selectionCount} selected · ${providerLabel(config.provider)}`
+              : `Ask anything · ${providerLabel(config.provider)}`}
           </span>
         </div>
         <button
@@ -132,7 +133,7 @@ export default function AiPanel({
           aria-label="Close AI assistant"
           onClick={onClose}
         >
-          ×
+          <IconClose />
         </button>
       </header>
       <div className="ai-region-control">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { paperImage, type Paper } from "../paper";
+import { saveBlob } from "../files";
 import Dialog from "./Dialog";
 
 export default function PaperExport({
@@ -21,9 +22,8 @@ export default function PaperExport({
     setBusy(true);
     setError("");
     try {
-      const { exportToCanvas, exportToSvg, getCommonBounds } = await import(
-        "@excalidraw/excalidraw"
-      );
+      const { exportToCanvas, exportToSvg, getCommonBounds } =
+        await import("@excalidraw/excalidraw");
       const elements = api.getSceneElements();
       if (!elements.length) throw new Error("Draw something before exporting.");
       const options = {
@@ -100,12 +100,15 @@ export default function PaperExport({
           type: "image/svg+xml",
         });
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name.replace(/[<>:"/\\|?*]/g, "_")}.${format}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      const fileName = `${name.replace(/[<>:"/\\|?*]/g, "_")}.${format}`;
+      const saved = await saveBlob(
+        fileName,
+        blob,
+        format === "png"
+          ? [{ name: "PNG image", extensions: ["png"] }]
+          : [{ name: "SVG image", extensions: ["svg"] }],
+      );
+      if (saved) onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

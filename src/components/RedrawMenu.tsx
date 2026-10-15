@@ -4,17 +4,20 @@ export default function RedrawMenu({
   onPages,
   onFocus,
   onExport,
+  onInsertImage,
   onTheme,
 }: {
   onSettings: () => void;
   onPages: () => void;
   onFocus: () => void;
   onExport: () => void;
+  onInsertImage: () => void;
   onTheme: () => void;
 }) {
   return (
     <MainMenu>
       <MainMenu.DefaultItems.Export />
+      <MainMenu.Item onSelect={onInsertImage}>Insert image…</MainMenu.Item>
       <MainMenu.Item onSelect={onExport}>Export image…</MainMenu.Item>
       <MainMenu.DefaultItems.SearchMenu />
       <MainMenu.Separator />

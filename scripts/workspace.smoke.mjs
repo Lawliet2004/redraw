@@ -37,6 +37,7 @@ import {getMeta,setMeta} from '/src/db.ts';
 export const DEFAULT_SUBSCRIPTION={provider:'chatgpt',model:''};
 export const loadSubscription=async()=>JSON.parse(await getMeta('subscription_config')||'null')||DEFAULT_SUBSCRIPTION;
 export const saveSubscription=async c=>setMeta('subscription_config',JSON.stringify(c));
+export const providerLabel=p=>p==='chatgpt'?'ChatGPT':p==='grok'?'Grok':'API key';
 export const subscriptionStatus=async p=>({available:true,authenticated:true,message:p+' connected',models:[{id:'test',name:'Test model'}]});
 export const subscriptionLogin=async()=>({message:'Sign in opened'});export const subscriptionLogout=async()=>{};
 export const streamSubscription=async opts=>{const response=await fetch('/mock-subscription',{method:'POST',body:JSON.stringify(opts),signal:opts.signal});const text=await response.text();opts.onDelta(text);return text;};
@@ -363,7 +364,9 @@ try {
   await page.getByRole("button", { name: "Export PNG", exact: true }).click();
   const download = await downloadPromise;
   await download.saveAs("artifacts/export-paper.png");
-  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page
+    .getByRole("button", { name: "Export PNG", exact: true })
+    .waitFor({ state: "detached" });
   await page.getByRole("button", { name: "✦ AI assistant" }).click();
   await page.locator(".ai-options summary").click();
   await page.getByLabel("Response type").selectOption("image");

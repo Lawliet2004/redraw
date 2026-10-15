@@ -5,7 +5,13 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { ExcalidrawElementSkeleton } from "@excalidraw/excalidraw/data/transform";
-import { stripAiMarkdown, joinInlineAnswer, SYSTEM_PROMPT } from "./llm";
+import {
+  stripAiMarkdown,
+  joinInlineAnswer,
+  streamChat,
+  SYSTEM_PROMPT,
+} from "./llm";
+import { loadLlmConfig } from "./credentials";
 import { DIAGRAM_SYSTEM_PROMPT, parseDiagram } from "./diagram";
 import { streamSubscription, type SubscriptionConfig } from "./subscriptions";
 import { validateIllustration, rasterizeIllustration } from "./illustration";
@@ -50,6 +56,28 @@ export function selectedQuery(
     }
   }
   return texts.join("\n").trim();
+}
+
+async function streamApiChat(opts: {
+  prompt: string;
+  image?: string;
+  signal: AbortSignal;
+  systemPrompt: string;
+  onDelta: (full: string) => void;
+}): Promise<string> {
+  const config = await loadLlmConfig();
+  if (!config.apiKey)
+    throw new Error(
+      "Add an API key in Settings → AI to use AI on this device.",
+    );
+  return streamChat({
+    config,
+    prompt: opts.prompt,
+    image: opts.image,
+    signal: opts.signal,
+    systemPrompt: opts.systemPrompt,
+    onDelta: opts.onDelta,
+  });
 }
 
 export async function generateAi(opts: {
@@ -172,19 +200,28 @@ export async function generateAi(opts: {
     action === "answer"
       ? evaluateMath(opts.instruction.trim() || selectedText)
       : null;
+  const onDelta = (full: string) => {
+    opts.onStatus("Generating…");
+    opts.onDelta(full);
+  };
   const raw =
     local ??
-    (await streamSubscription({
-      config: opts.config,
-      prompt,
-      image,
-      signal,
-      systemPrompt: tasks[action],
-      onDelta: (full) => {
-        opts.onStatus("Generating…");
-        opts.onDelta(full);
-      },
-    }));
+    (opts.config.provider === "api"
+      ? await streamApiChat({
+          prompt,
+          image,
+          signal,
+          systemPrompt: tasks[action],
+          onDelta,
+        })
+      : await streamSubscription({
+          config: opts.config,
+          prompt,
+          image,
+          signal,
+          systemPrompt: tasks[action],
+          onDelta,
+        }));
   signal.throwIfAborted();
   const text =
     action === "diagram" || action === "image"

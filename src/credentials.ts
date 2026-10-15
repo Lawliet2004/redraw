@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getMeta, setMeta } from "./db";
 import { DEFAULT_LLM, type LlmConfig } from "./llm";
+import { isMobileOS } from "./platform";
 
 let sessionKey = "";
 export async function credentialsAvailable(): Promise<boolean> {
@@ -28,7 +29,8 @@ export async function loadLlmConfig(): Promise<LlmConfig> {
       id: saved.credentialId,
     });
   // Existing installations migrate only after the protected write succeeds.
-  if (saved.apiKey) await saveLlmConfig(config);
+  if (saved.apiKey && (await credentialsAvailable()))
+    await saveLlmConfig(config);
   return config;
 }
 
@@ -49,6 +51,9 @@ export async function saveLlmConfig(config: LlmConfig): Promise<void> {
         baseUrl: config.baseUrl.trim(),
         model: config.model.trim(),
         credentialId,
+        // mobile has no OS keychain: keep the key in the app-private sandbox
+        // DB; desktop without a keychain stays session-only as before
+        apiKey: !protectedStore && isMobileOS() ? config.apiKey : undefined,
       }),
     );
     sessionKey = config.apiKey;

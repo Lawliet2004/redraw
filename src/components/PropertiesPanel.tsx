@@ -5,6 +5,7 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import { IconChevronDown, IconChevronLeft } from "./icons";
 
 type Style = Pick<
   ExcalidrawElement,
@@ -99,7 +100,7 @@ export default function PropertiesPanel({
           aria-label="Hide properties"
           onClick={onHide}
         >
-          «
+          <IconChevronLeft />
         </button>
       </header>
       <p className="selection-caption">
@@ -110,7 +111,10 @@ export default function PropertiesPanel({
             : "Style for your next shape"}
       </p>
       <details open>
-        <summary>Appearance</summary>
+        <summary>
+          <IconChevronDown className="props-chevron" />
+          Appearance
+        </summary>
         <div className="color-fields">
           <label>
             Stroke
@@ -227,7 +231,10 @@ export default function PropertiesPanel({
         </label>
       </details>
       <details>
-        <summary>Geometry & arrange</summary>
+        <summary>
+          <IconChevronDown className="props-chevron" />
+          Geometry & arrange
+        </summary>
         {selected.length === 1 && (
           <p className="muted">
             {Math.round(first.width)} × {Math.round(first.height)} canvas units

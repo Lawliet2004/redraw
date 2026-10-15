@@ -10,13 +10,18 @@ export default defineConfig(async () => ({
     "process.env.IS_PREACT": JSON.stringify(false),
   },
   optimizeDeps: {
-    include: ["@excalidraw/excalidraw"],
+    include: ["@excalidraw/excalidraw", "onnxruntime-web"],
   },
   build: {
     target: "esnext",
     minify: "esbuild",
     cssMinify: true,
     chunkSizeWarningLimit: 2000,
+  },
+  worker: {
+    // module workers so Smart Ink's recognizer can code-split (safe in all
+    // Tauri webviews; iife would forbid the worker's imports)
+    format: "es",
   },
   clearScreen: false,
   server: {

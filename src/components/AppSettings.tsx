@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Dialog from "./Dialog";
 import { parsePaper, type Paper } from "../paper";
 import type { Preferences } from "../preferences";
+import { cssFamily, INK_FONTS } from "../smartink/fonts";
+import { clearModelCache, isModelCached, MODEL } from "../smartink/modelStore";
 
 export function Segments<T extends string>({
   label,
@@ -79,6 +81,21 @@ export default function AppSettings({
   const [section, setSection] = useState("Workspace");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [modelCached, setModelCached] = useState<boolean | null>(null);
+  useEffect(() => {
+    let on = true;
+    void isModelCached()
+      .then((v) => on && setModelCached(v))
+      .catch(() => on && setModelCached(null));
+    return () => {
+      on = false;
+    };
+  }, []);
+  const ink = draft.smartInk;
+  const patchInk = (patch: Partial<Preferences["smartInk"]>) =>
+    setDraft({ ...draft, smartInk: { ...ink, ...patch } });
+  const patchInkStyle = (patch: Partial<Preferences["smartInk"]["style"]>) =>
+    patchInk({ style: { ...ink.style, ...patch } });
   return (
     <Dialog title="Settings" onClose={onClose}>
       <form
@@ -103,7 +120,7 @@ export default function AppSettings({
         }}
       >
         <nav className="settings-tabs" aria-label="Settings sections">
-          {["Workspace", "Canvas", "AI"].map((s) => (
+          {["Workspace", "Canvas", "Ink", "AI"].map((s) => (
             <button
               type="button"
               key={s}
@@ -235,6 +252,101 @@ export default function AppSettings({
             />
           </>
         )}
+        {section === "Ink" && (
+          <>
+            <Switch
+              label="Smart Ink"
+              description="Convert handwriting to styled, editable text."
+              checked={ink.enabled}
+              onChange={(enabled) => patchInk({ enabled })}
+            />
+            <Segments
+              label="Conversion"
+              value={ink.mode}
+              options={[
+                { value: "auto", label: "Automatic" },
+                { value: "preview", label: "Preview" },
+                { value: "manual", label: "Manual" },
+              ]}
+              onChange={(mode) => patchInk({ mode })}
+            />
+            <label className="setting-field">
+              Convert after · {Math.round(ink.delayMs / 100) / 10}s pause
+              <input
+                aria-label="Conversion delay"
+                type="range"
+                min="300"
+                max="3000"
+                step="100"
+                value={ink.delayMs}
+                disabled={ink.mode === "manual"}
+                onChange={(e) => patchInk({ delayMs: Number(e.target.value) })}
+              />
+            </label>
+            <label className="setting-field">
+              Confidence · {Math.round(ink.confidence * 100)}%
+              <input
+                aria-label="Confidence threshold"
+                type="range"
+                min="0.5"
+                max="0.95"
+                step="0.05"
+                value={ink.confidence}
+                disabled={ink.mode === "manual"}
+                onChange={(e) => patchInk({ confidence: Number(e.target.value) })}
+              />
+            </label>
+            <Switch
+              label="Contextual correction"
+              description="Fix obvious slips (teh→the, stray capitals). Never rewrites words."
+              checked={ink.spellFix}
+              onChange={(spellFix) => patchInk({ spellFix })}
+            />
+            <div className="setting-field">
+              <span>Default ink font</span>
+              <select
+                aria-label="Default ink font"
+                value={ink.style.fontFamily}
+                onChange={(e) => patchInkStyle({ fontFamily: Number(e.target.value) })}
+              >
+                {INK_FONTS.map((f) => (
+                  <option key={f.label} value={f.variants.regular.code}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="muted">
+              Preview —{" "}
+              <span
+                style={{
+                  fontFamily: cssFamily(ink.style.fontFamily),
+                  fontSize: 18,
+                  color: ink.style.color,
+                }}
+              >
+                Handwriting to text
+              </span>
+            </p>
+            <p className="muted">
+              Recognition runs entirely on this device — nothing is uploaded.
+              Model: {MODEL.label} (~8 MB, bundled).
+            </p>
+            {modelCached && (
+              <button
+                type="button"
+                className="settings-link"
+                onClick={() =>
+                  void clearModelCache()
+                    .then(() => setModelCached(false))
+                    .catch(() => {})
+                }
+              >
+                Clear model cache <span>×</span>
+              </button>
+            )}
+          </>
+        )}
         {section === "AI" && (
           <>
             <Segments
@@ -250,7 +362,8 @@ export default function AppSettings({
             <p className="muted">
               Assist previews an answer beside selected writing after a pause.
               Auto-answer inserts it. Simple math runs on this device; other
-              requests send selected content to your connected subscription.
+              requests send selected content to your connected subscription or
+              API key.
               Select a question or handwriting to limit the context.
             </p>
             <button

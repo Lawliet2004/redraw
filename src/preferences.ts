@@ -1,4 +1,9 @@
 import { DEFAULT_PAPER, parsePaper, type Paper } from "./paper";
+import {
+  DEFAULT_SMART_INK,
+  parseSmartInkSettings,
+  type SmartInkSettings,
+} from "./smartink/types";
 export type Preferences = {
   tabLayout: "horizontal" | "vertical";
   density: "compact" | "comfortable";
@@ -10,6 +15,7 @@ export type Preferences = {
   palette: "neutral" | "indigo" | "forest";
   defaultPaper: Paper;
   pinnedPages: string[];
+  smartInk: SmartInkSettings;
 };
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -23,6 +29,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   palette: "neutral",
   defaultPaper: DEFAULT_PAPER,
   pinnedPages: [],
+  smartInk: DEFAULT_SMART_INK,
 };
 
 export function parsePreferences(raw: string | null): Preferences {
@@ -48,6 +55,7 @@ export function parsePreferences(raw: string | null): Preferences {
       pinnedPages: Array.isArray(p.pinnedPages)
         ? p.pinnedPages.filter((id: unknown) => typeof id === "string")
         : [],
+      smartInk: parseSmartInkSettings(p.smartInk),
     };
   } catch {
     return { ...DEFAULT_PREFERENCES };

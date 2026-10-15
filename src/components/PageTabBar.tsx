@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { ReactNode } from "react";
 import { isTouchUi } from "../platform";
 import logoUrl from "../assets/logo.png";
+import { IconClose, IconPages, IconPlus } from "./icons";
 
 export type TabPage = {
   id: string;
@@ -18,6 +20,7 @@ type Props = {
   onCreate: () => void;
   onRename: (id: string, name: string) => void;
   onClosePage: (id: string) => void;
+  trailing?: ReactNode;
 };
 
 export default function PageTabBar({
@@ -30,6 +33,7 @@ export default function PageTabBar({
   onCreate,
   onRename,
   onClosePage,
+  trailing,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -125,7 +129,7 @@ export default function PageTabBar({
         aria-label="All pages"
         onClick={onPages}
       >
-        ▤
+        <IconPages />
       </button>
       <div className="titlebar__tabs" role="tablist" aria-label="Open pages">
         {pages.map((page) => {
@@ -224,7 +228,7 @@ export default function PageTabBar({
                   if (canDelete) onClosePage(page.id);
                 }}
               >
-                ×
+                <IconClose />
               </button>
             </div>
           );
@@ -236,7 +240,7 @@ export default function PageTabBar({
           aria-label="New page"
           onClick={onCreate}
         >
-          +
+          <IconPlus />
         </button>
       </div>
 
@@ -244,6 +248,8 @@ export default function PageTabBar({
         className="titlebar__spacer"
         {...(!touch ? { "data-tauri-drag-region": true } : {})}
       />
+
+      {trailing && <div className="titlebar__trailing no-drag">{trailing}</div>}
 
       {!touch && (
         <div className="titlebar__controls no-drag">

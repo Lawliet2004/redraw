@@ -7,7 +7,9 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { isTouchUi } from "./platform";
+import { isMobileOS, isTauri, isTouchUi, usePhoneLayout } from "./platform";
+import { IconFocus, IconPen, IconSliders } from "./components/icons";
+import { insertImages, pickImageFiles } from "./files";
 import type {
   AppState,
   BinaryFiles,
@@ -59,6 +61,7 @@ import {
 
 const RedrawMenu = lazy(() => import("./components/RedrawMenu"));
 const PropertiesPanel = lazy(() => import("./components/PropertiesPanel"));
+const SmartInkManager = lazy(() => import("./components/SmartInkManager"));
 
 const Excalidraw = lazy(async () => {
   await import("@excalidraw/excalidraw/index.css");
@@ -165,6 +168,9 @@ export default function App() {
   const [pagesOpen, setPagesOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [advanced, setAdvanced] = useState(false);
+  const phone = usePhoneLayout();
+  const [phoneProps, setPhoneProps] = useState(false);
+  const propsShown = phone ? phoneProps : preferences.propertiesVisible;
   const [closedIds, setClosedIdsState] = useState<string[]>([]);
   const closedIdsRef = useRef<string[]>([]);
   const setClosedIds = useCallback(
@@ -215,6 +221,7 @@ export default function App() {
     useState<SubscriptionConfig>(DEFAULT_SUBSCRIPTION);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const imageToolHandled = useRef(false);
 
   useEffect(() => {
     setTouch(isTouchUi());
@@ -514,6 +521,16 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [askAi]);
 
+  const insertImageFiles = useCallback(async () => {
+    const api = apiRef.current;
+    if (!api) return;
+    try {
+      await insertImages(api, await pickImageFiles());
+    } catch (e) {
+      reportError(e);
+    }
+  }, [reportError]);
+
   const onChange = useCallback(
     (
       _elements: readonly OrderedExcalidrawElement[],
@@ -532,6 +549,15 @@ export default function App() {
             },
       );
       if (switchingRef.current) return;
+      if (isTauri() && isMobileOS() && appState.activeTool.type === "image") {
+        if (!imageToolHandled.current) {
+          imageToolHandled.current = true;
+          apiRef.current?.setActiveTool({ type: "selection" });
+          void insertImageFiles();
+        }
+      } else {
+        imageToolHandled.current = false;
+      }
       if (
         appState.viewBackgroundColor !== "transparent" &&
         /^#[\da-f]{6}$/i.test(appState.viewBackgroundColor)
@@ -551,7 +577,7 @@ export default function App() {
       }
       scheduleSave();
     },
-    [scheduleSave],
+    [scheduleSave, insertImageFiles],
   );
 
   useEffect(() => {
@@ -677,6 +703,29 @@ export default function App() {
       navigate(() => closePage(id));
     },
   };
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (!container || !phone || !canvasApi) return;
+    const update = () => {
+      const islands = [...container.querySelectorAll<HTMLElement>(".App-toolbar")];
+      const bottom = islands.reduce<HTMLElement | null>(
+        (a, b) =>
+          !a || b.getBoundingClientRect().top > a.getBoundingClientRect().top
+            ? b
+            : a,
+        null,
+      );
+      const dock = bottom
+        ? container.getBoundingClientRect().bottom -
+          bottom.getBoundingClientRect().top
+        : 0;
+      container.style.setProperty("--dock-h", `${Math.round(dock)}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [phone, canvasApi]);
   const activePage = pages.find((p) => p.id === activeId);
 
   if (!ready || !initialData) {
@@ -696,7 +745,7 @@ export default function App() {
 
   return (
     <div
-      className={`app-shell palette-${preferences.palette} density-${preferences.density} ${focusMode ? "is-focused" : ""} ${advanced && preferences.propertiesVisible ? "show-advanced" : ""} ${theme === "dark" ? "app-shell--dark" : ""} ${touch ? "app-shell--touch" : ""}`}
+      className={`app-shell palette-${preferences.palette} density-${preferences.density} ${focusMode ? "is-focused" : ""} ${advanced && propsShown ? "show-advanced" : ""} ${theme === "dark" ? "app-shell--dark" : ""} ${touch ? "app-shell--touch" : ""} ${phone ? "is-phone" : ""}`}
       style={
         theme === "dark"
           ? ({
@@ -727,6 +776,17 @@ export default function App() {
           void handleRename(id, name).catch(reportError);
         }}
         onClosePage={pageProps.onClosePage}
+        trailing={
+          !focusMode && phone ? (
+            <AiBar
+              busy={false}
+              theme={theme}
+              onAsk={askAi}
+              onStop={() => setAiOpen(false)}
+              onSettings={() => setSettingsOpen(true)}
+            />
+          ) : undefined
+        }
       />
       <div className="workspace-body">
         {preferences.tabLayout === "vertical" && !focusMode && (
@@ -748,7 +808,7 @@ export default function App() {
               backgroundPosition: `${viewport.x * viewport.zoom}px ${viewport.y * viewport.zoom}px`,
             }}
           />
-          {!focusMode && (
+          {!focusMode && !phone && (
             <div className="workspace-ai-tools">
               <AiBar
                 busy={false}
@@ -759,31 +819,57 @@ export default function App() {
               />
             </div>
           )}
-          <div className="workspace-tools">
+          <div className="workspace-tools" role="group" aria-label="Workspace tools">
             <button
-              aria-pressed={preferences.propertiesVisible && !focusMode}
+              type="button"
+              className="ws-tool"
+              aria-pressed={propsShown && !focusMode}
               onClick={() => {
                 if (focusMode) setFocusMode(false);
+                else if (phone) setPhoneProps((v) => !v);
                 else
                   patchPreferences({
                     propertiesVisible: !preferences.propertiesVisible,
                   });
               }}
             >
-              {focusMode
-                ? "Exit focus"
-                : preferences.propertiesVisible
-                  ? "Hide properties"
-                  : "Properties"}
+              <IconSliders />
+              <span className="ws-tool__label">
+                {focusMode
+                  ? "Exit focus"
+                  : propsShown
+                    ? "Hide properties"
+                    : "Properties"}
+              </span>
             </button>
             {!focusMode && (
               <button
+                type="button"
+                className="ws-tool"
                 title="Focus mode (Ctrl+Shift+F)"
                 onClick={() => setFocusMode(true)}
               >
-                Focus
+                <IconFocus />
+                <span className="ws-tool__label">Focus</span>
               </button>
             )}
+            <button
+              type="button"
+              className="ws-tool"
+              aria-pressed={preferences.smartInk.enabled}
+              title="Smart Ink — write with the pen, convert handwriting to styled text"
+              onClick={() =>
+                patchPreferences({
+                  smartInk: {
+                    ...preferences.smartInk,
+                    enabled: !preferences.smartInk.enabled,
+                  },
+                })
+              }
+            >
+              <IconPen />
+              <span className="ws-tool__label">Ink</span>
+            </button>
           </div>
           {saveError && (
             <div className="save-error" role="alert">
@@ -797,19 +883,33 @@ export default function App() {
               </button>
             </div>
           )}
-          {!focusMode &&
-            preferences.propertiesVisible &&
-            !advanced &&
-            canvasApi && (
+          {!focusMode && propsShown && !advanced && canvasApi && (
+            <>
+              {phone && (
+                <button
+                  type="button"
+                  className="sheet-backdrop"
+                  aria-label="Close properties"
+                  onClick={() => setPhoneProps(false)}
+                />
+              )}
               <Suspense fallback={null}>
                 <PropertiesPanel
                   api={canvasApi}
-                  onHide={() => patchPreferences({ propertiesVisible: false })}
-                  onAdvanced={() => setAdvanced(true)}
+                  onHide={() =>
+                    phone
+                      ? setPhoneProps(false)
+                      : patchPreferences({ propertiesVisible: false })
+                  }
+                  onAdvanced={() => {
+                    setAdvanced(true);
+                    setPhoneProps(false);
+                  }}
                 />
               </Suspense>
-            )}
-          {advanced && preferences.propertiesVisible && !focusMode && (
+            </>
+          )}
+          {advanced && propsShown && !focusMode && (
             <button
               className="advanced-back"
               onClick={() => setAdvanced(false)}
@@ -840,7 +940,7 @@ export default function App() {
                   loadScene: false,
                   saveToActiveFile: false,
                   export: { saveFileToDisk: true },
-                  saveAsImage: true,
+                  saveAsImage: !isMobileOS(),
                   toggleTheme: true,
                   clearCanvas: true,
                 },
@@ -851,6 +951,7 @@ export default function App() {
             >
               <RedrawMenu
                 onExport={() => setExportOpen(true)}
+                onInsertImage={() => void insertImageFiles()}
                 onTheme={() =>
                   patchPreferences({
                     appTheme: theme === "dark" ? "light" : "dark",
@@ -872,6 +973,21 @@ export default function App() {
               disabled={aiOpen || settingsOpen || aiSettingsOpen || focusMode}
               onSettings={() => setAiSettingsOpen(true)}
             />
+          )}
+          {canvasApi && (
+            <Suspense fallback={null}>
+              <SmartInkManager
+                key={`ink-${activeId}`}
+                api={canvasApi}
+                settings={preferences.smartInk}
+                disabled={focusMode}
+                onChangeSettings={(patch) =>
+                  patchPreferences({
+                    smartInk: { ...preferencesRef.current.smartInk, ...patch },
+                  })
+                }
+              />
+            </Suspense>
           )}
           {aiOpen && canvasApi && !focusMode && (
             <AiPanel
