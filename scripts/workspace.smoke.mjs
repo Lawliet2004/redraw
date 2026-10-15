@@ -70,12 +70,7 @@ await mkdir("artifacts", { recursive: true });
 try {
   await page.goto("http://localhost:1422");
   await page.getByRole("button", { name: "Settings", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("button", { name: "Vertical", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save settings", exact: true })
-    .click();
-  await page.getByRole("complementary", { name: "Page sidebar" }).waitFor();
+  await page.getByRole("complementary", { name: "Sidebar" }).waitFor();
   await page.screenshot({ path: "artifacts/workspace-desktop.png" });
   await page.getByLabel("Actions for Product flow").click();
   await page.getByRole("button", { name: "Pin tab", exact: true }).click();
@@ -99,15 +94,17 @@ try {
     .click();
   await page.getByText("Current page").waitFor();
   await page
-    .getByRole("button", { name: "Collapse pages", exact: true })
+    .getByRole("button", { name: "Collapse sidebar", exact: true })
     .click();
   assert.equal(
     await page
-      .locator(".pages-panel")
+      .locator(".app-rail")
       .evaluate((el) => Math.round(el.getBoundingClientRect().width)),
-    48,
+    52,
   );
-  await page.getByRole("button", { name: "Expand pages", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Expand sidebar", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Hide properties", exact: true })
     .first()
@@ -120,10 +117,12 @@ try {
   await page.keyboard.press("Control+Shift+F");
   await page.getByRole("button", { name: "Exit focus" }).waitFor();
   await page.keyboard.press("Escape");
-  await page.getByRole("complementary", { name: "Page sidebar" }).waitFor();
+  await page.getByRole("complementary", { name: "Sidebar" }).waitFor();
   await page.reload();
-  await page.getByRole("complementary", { name: "Page sidebar" }).waitFor();
-  await page.getByRole("button", { name: "✦ AI assistant" }).click();
+  await page.getByRole("complementary", { name: "Sidebar" }).waitFor();
+  await page
+    .getByRole("button", { name: "AI assistant", exact: true })
+    .click();
   await page
     .getByRole("textbox", { name: "AI instruction" })
     .fill("Explain a simple workflow");
@@ -161,7 +160,9 @@ try {
   assert.equal(afterUndo, 1, "one undo removes entire diagram");
   await page.locator(".excalidraw").focus();
   await page.keyboard.press("Control+a");
-  await page.getByRole("button", { name: "✦ AI assistant" }).click();
+  await page
+    .getByRole("button", { name: "AI assistant", exact: true })
+    .click();
   await page.locator(".ai-options summary").click();
   await page.getByLabel("Response type").selectOption("explain");
   let release;
@@ -205,18 +206,14 @@ try {
     assert.equal(overflow, false, "no document overflow at " + width);
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("button", { name: "Horizontal", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save settings", exact: true })
-    .click();
-  await page.getByRole("tablist", { name: "Open pages" }).waitFor();
-  await page.getByRole("button", { name: "Close Notes", exact: true }).click();
-  assert.equal(await page.getByRole("tab", { name: /Notes/ }).count(), 0);
-  await page.getByRole("button", { name: "All pages", exact: true }).click();
+  await page.getByRole("complementary", { name: "Sidebar" }).waitFor();
+  await page.getByLabel("Actions for Notes").click();
+  await page.getByRole("button", { name: "Close tab", exact: true }).click();
+  await page.getByText("Closed · click to reopen").waitFor();
+  await page.keyboard.press("Control+k");
   await page.getByLabel("Search pages and commands").fill("Notes");
   await page.keyboard.press("Enter");
-  await page.getByRole("tab", { name: /Notes/ }).waitFor();
+  await page.getByText("Current page").waitFor();
   await page.evaluate(async () => {
     const db = await import("/src/db.ts");
     await db.setMeta(
@@ -367,7 +364,9 @@ try {
   await page
     .getByRole("button", { name: "Export PNG", exact: true })
     .waitFor({ state: "detached" });
-  await page.getByRole("button", { name: "✦ AI assistant" }).click();
+  await page
+    .getByRole("button", { name: "AI assistant", exact: true })
+    .click();
   await page.locator(".ai-options summary").click();
   await page.getByLabel("Response type").selectOption("image");
   await page

@@ -69,11 +69,11 @@ try {
   );
   await page.goto("http://localhost:1420/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".excalidraw", { timeout: 30000 });
-  await page.waitForSelector(".workspace-tools", { timeout: 15000 });
+  await page.waitForSelector(".app-rail", { timeout: 15000 });
   await page.waitForTimeout(1500);
 
   // enable Smart Ink → floating bar appears, pen tool becomes active
-  await page.click('.workspace-tools button:has-text("Ink")');
+  await page.click('.app-rail button:has-text("Smart Ink")');
   await page.waitForSelector(".ink-bar", { timeout: 10000 });
   await page.waitForSelector('.ink-mode button[aria-pressed="true"]');
   // thicker pen for a more legible render

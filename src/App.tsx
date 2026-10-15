@@ -8,7 +8,7 @@ import {
   type CSSProperties,
 } from "react";
 import { isMobileOS, isTauri, isTouchUi, usePhoneLayout } from "./platform";
-import { IconFocus, IconPen, IconSliders } from "./components/icons";
+import { IconChevronRight, IconFocus } from "./components/icons";
 import { insertImages, pickImageFiles } from "./files";
 import type {
   AppState,
@@ -21,16 +21,16 @@ import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/ty
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import "./App.css";
-import PageTabBar from "./components/PageTabBar";
+import SideRail from "./components/SideRail";
 import AppSettings from "./components/AppSettings";
-import PagesPanel, { PageList } from "./components/PagesPanel";
+import { PageList } from "./components/PageList";
 import Dialog from "./components/Dialog";
 import {
   DEFAULT_PREFERENCES,
   parsePreferences,
   type Preferences,
 } from "./preferences";
-import AiBar, { AiSettingsDialog } from "./components/AiBar";
+import { AiSettingsDialog } from "./components/AiSettingsDialog";
 import {
   bootstrapPages,
   createPage,
@@ -171,6 +171,8 @@ export default function App() {
   const phone = usePhoneLayout();
   const [phoneProps, setPhoneProps] = useState(false);
   const propsShown = phone ? phoneProps : preferences.propertiesVisible;
+  const [railOpen, setRailOpen] = useState(false);
+  const railCollapsed = phone ? !railOpen : preferences.sidebarCollapsed;
   const [closedIds, setClosedIdsState] = useState<string[]>([]);
   const closedIdsRef = useRef<string[]>([]);
   const setClosedIds = useCallback(
@@ -614,9 +616,11 @@ export default function App() {
         e.key.toLowerCase() === "p"
       ) {
         e.preventDefault();
-        patchPreferences({
-          propertiesVisible: !preferencesRef.current.propertiesVisible,
-        });
+        if (phone) setPhoneProps((v) => !v);
+        else
+          patchPreferences({
+            propertiesVisible: !preferencesRef.current.propertiesVisible,
+          });
       }
       if (
         (e.ctrlKey || e.metaKey) &&
@@ -635,7 +639,7 @@ export default function App() {
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [patchPreferences]);
+  }, [patchPreferences, phone]);
 
   useEffect(() => {
     if (!ready) return;
@@ -707,7 +711,9 @@ export default function App() {
     const container = canvasContainerRef.current;
     if (!container || !phone || !canvasApi) return;
     const update = () => {
-      const islands = [...container.querySelectorAll<HTMLElement>(".App-toolbar")];
+      const islands = [
+        ...container.querySelectorAll<HTMLElement>(".App-toolbar"),
+      ];
       const bottom = islands.reduce<HTMLElement | null>(
         (a, b) =>
           !a || b.getBoundingClientRect().top > a.getBoundingClientRect().top
@@ -758,45 +764,108 @@ export default function App() {
             } as CSSProperties)
       }
     >
-      <PageTabBar
-        pages={[...pages]
-          .sort(
-            (a, b) =>
-              Number(preferences.pinnedPages.includes(b.id)) -
-              Number(preferences.pinnedPages.includes(a.id)),
-          )
-          .filter((p) => !closedIds.includes(p.id))}
-        vertical={preferences.tabLayout === "vertical"}
-        onPages={() => setQuickOpen(true)}
-        activeId={activeId}
-        theme={theme}
-        onSelect={pageProps.onSelect}
-        onCreate={pageProps.onCreate}
-        onRename={(id, name) => {
-          void handleRename(id, name).catch(reportError);
-        }}
-        onClosePage={pageProps.onClosePage}
-        trailing={
-          !focusMode && phone ? (
-            <AiBar
-              busy={false}
-              theme={theme}
-              onAsk={askAi}
-              onStop={() => setAiOpen(false)}
-              onSettings={() => setSettingsOpen(true)}
-            />
-          ) : undefined
-        }
-      />
+      {phone && railOpen && !focusMode && (
+        <button
+          type="button"
+          className="sheet-backdrop"
+          aria-label="Close panel"
+          onClick={() => setRailOpen(false)}
+        />
+      )}
       <div className="workspace-body">
-        {preferences.tabLayout === "vertical" && !focusMode && (
-          <PagesPanel
-            {...pageProps}
-            preferences={preferences}
-            onPreferences={patchPreferences}
+        {!focusMode && (!phone || railOpen) && (
+          <SideRail
+            pageList={{
+              ...pageProps,
+              onSelect: (id) => {
+                pageProps.onSelect(id);
+                setRailOpen(false);
+              },
+            }}
+            railPages={[...pages]
+              .sort(
+                (a, b) =>
+                  Number(preferences.pinnedPages.includes(b.id)) -
+                  Number(preferences.pinnedPages.includes(a.id)),
+              )
+              .filter((p) => !closedIds.includes(p.id))}
+            collapsed={railCollapsed}
+            overlay={phone}
+            onToggleCollapsed={() => {
+              if (phone) setRailOpen((v) => !v);
+              else
+                patchPreferences({
+                  sidebarCollapsed: !preferences.sidebarCollapsed,
+                });
+            }}
+            width={preferences.sidebarWidth}
+            onResize={(w) =>
+              patchPreferences({
+                sidebarWidth: Math.min(360, Math.max(200, Math.round(w))),
+              })
+            }
+            touch={touch}
+            theme={theme}
+            propertiesShown={propsShown}
+            onToggleProperties={() => {
+              setRailOpen(false);
+              if (phone) setPhoneProps((v) => !v);
+              else
+                patchPreferences({
+                  propertiesVisible: !preferences.propertiesVisible,
+                });
+            }}
+            inkEnabled={preferences.smartInk.enabled}
+            onToggleInk={() => {
+              setRailOpen(false);
+              patchPreferences({
+                smartInk: {
+                  ...preferencesRef.current.smartInk,
+                  enabled: !preferencesRef.current.smartInk.enabled,
+                },
+              });
+            }}
+            onAsk={() => {
+              setRailOpen(false);
+              askAi();
+            }}
+            onFocus={() => {
+              setRailOpen(false);
+              setFocusMode(true);
+            }}
+            onSettings={() => {
+              setRailOpen(false);
+              setSettingsOpen(true);
+            }}
+            onTheme={() =>
+              patchPreferences({
+                appTheme: theme === "dark" ? "light" : "dark",
+              })
+            }
           />
         )}
         <div className="app-shell__canvas" ref={canvasContainerRef}>
+          {phone && !railOpen && !focusMode && (
+            <button
+              type="button"
+              className="rail-open workspace-surface"
+              aria-label="Open panel"
+              title="Open panel"
+              onClick={() => setRailOpen(true)}
+            >
+              <IconChevronRight />
+            </button>
+          )}
+          {focusMode && (
+            <button
+              type="button"
+              className="exit-focus workspace-surface"
+              onClick={() => setFocusMode(false)}
+            >
+              <IconFocus />
+              <span>Exit focus</span>
+            </button>
+          )}
           <div
             className="paper-background"
             aria-hidden="true"
@@ -808,69 +877,6 @@ export default function App() {
               backgroundPosition: `${viewport.x * viewport.zoom}px ${viewport.y * viewport.zoom}px`,
             }}
           />
-          {!focusMode && !phone && (
-            <div className="workspace-ai-tools">
-              <AiBar
-                busy={false}
-                theme={theme}
-                onAsk={askAi}
-                onStop={() => setAiOpen(false)}
-                onSettings={() => setSettingsOpen(true)}
-              />
-            </div>
-          )}
-          <div className="workspace-tools" role="group" aria-label="Workspace tools">
-            <button
-              type="button"
-              className="ws-tool"
-              aria-pressed={propsShown && !focusMode}
-              onClick={() => {
-                if (focusMode) setFocusMode(false);
-                else if (phone) setPhoneProps((v) => !v);
-                else
-                  patchPreferences({
-                    propertiesVisible: !preferences.propertiesVisible,
-                  });
-              }}
-            >
-              <IconSliders />
-              <span className="ws-tool__label">
-                {focusMode
-                  ? "Exit focus"
-                  : propsShown
-                    ? "Hide properties"
-                    : "Properties"}
-              </span>
-            </button>
-            {!focusMode && (
-              <button
-                type="button"
-                className="ws-tool"
-                title="Focus mode (Ctrl+Shift+F)"
-                onClick={() => setFocusMode(true)}
-              >
-                <IconFocus />
-                <span className="ws-tool__label">Focus</span>
-              </button>
-            )}
-            <button
-              type="button"
-              className="ws-tool"
-              aria-pressed={preferences.smartInk.enabled}
-              title="Smart Ink — write with the pen, convert handwriting to styled text"
-              onClick={() =>
-                patchPreferences({
-                  smartInk: {
-                    ...preferences.smartInk,
-                    enabled: !preferences.smartInk.enabled,
-                  },
-                })
-              }
-            >
-              <IconPen />
-              <span className="ws-tool__label">Ink</span>
-            </button>
-          </div>
           {saveError && (
             <div className="save-error" role="alert">
               {saveError}
@@ -1025,14 +1031,14 @@ export default function App() {
             { name: "Focus mode", run: () => setFocusMode((v) => !v) },
             { name: "AI assistant", run: askAi },
             {
-              name: "Toggle vertical tabs",
-              run: () =>
-                patchPreferences({
-                  tabLayout:
-                    preferences.tabLayout === "vertical"
-                      ? "horizontal"
-                      : "vertical",
-                }),
+              name: "Toggle sidebar",
+              run: () => {
+                if (phone) setRailOpen((v) => !v);
+                else
+                  patchPreferences({
+                    sidebarCollapsed: !preferences.sidebarCollapsed,
+                  });
+              },
             },
           ]}
         />

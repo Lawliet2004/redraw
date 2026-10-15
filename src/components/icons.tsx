@@ -102,3 +102,14 @@ export const IconAlignRight = (p: SVGProps<SVGSVGElement>) => (
     <path d="M2.5 3.5h11M6.5 6.5h7M2.5 9.5h11M6.5 12.5h7" />
   </Icon>
 );
+export const IconSun = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <circle cx="8" cy="8" r="3" />
+    <path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1" />
+  </Icon>
+);
+export const IconMoon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z" />
+  </Icon>
+);

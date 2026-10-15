@@ -152,10 +152,10 @@ try {
   console.log("export: ok", download.suggestedFilename(), bytes.length, "bytes");
 
   // (c) AI via API key: configure in Settings → AI connection, then ask
-  await page.waitForSelector('.ai-bar button[aria-label="Settings"]', {
-    timeout: 10000,
-  });
-  await page.click('.ai-bar button[aria-label="Settings"]');
+  await page.waitForSelector(".rail-open", { timeout: 10000 });
+  await page.click(".rail-open");
+  await page.click('.app-rail button:has-text("Settings")');
+  await page.waitForSelector(".settings-dialog", { timeout: 10000 });
   await page.click('.settings-tabs button:text-is("AI")');
   await page.click('button:has-text("ChatGPT and Grok subscriptions")');
   await page.waitForSelector('input[type="password"]', { timeout: 10000 });
@@ -170,7 +170,11 @@ try {
   assert.equal(saved.apiKey, API_KEY, "API key persisted without protected store");
   console.log("api key persisted in llm_config: ok");
 
-  await page.click('.ai-bar button.primary:has-text("AI assistant")');
+  // close settings dialog, reopen the rail, launch AI
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".rail-open", { timeout: 10000 });
+  await page.click(".rail-open");
+  await page.click('.app-rail button:has-text("AI assistant")');
   await page.waitForSelector(".ai-panel textarea", { timeout: 10000 });
   await page.fill(".ai-panel textarea", "capital of France");
   await page.click('.ai-panel button:has-text("Generate")');

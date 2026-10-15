@@ -155,15 +155,6 @@ export default function AppSettings({
             />
 
             <Segments
-              label="Tab layout"
-              value={draft.tabLayout}
-              options={[
-                { value: "horizontal", label: "Horizontal" },
-                { value: "vertical", label: "Vertical" },
-              ]}
-              onChange={(tabLayout) => setDraft({ ...draft, tabLayout })}
-            />
-            <Segments
               label="Interface density"
               value={draft.density}
               options={[

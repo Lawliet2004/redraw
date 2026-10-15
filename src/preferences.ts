@@ -5,7 +5,6 @@ import {
   type SmartInkSettings,
 } from "./smartink/types";
 export type Preferences = {
-  tabLayout: "horizontal" | "vertical";
   density: "compact" | "comfortable";
   sidebarCollapsed: boolean;
   sidebarWidth: number;
@@ -19,7 +18,6 @@ export type Preferences = {
 };
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  tabLayout: "horizontal",
   density: "compact",
   sidebarCollapsed: false,
   sidebarWidth: 240,
@@ -36,7 +34,6 @@ export function parsePreferences(raw: string | null): Preferences {
   try {
     const p = JSON.parse(raw || "{}");
     return {
-      tabLayout: p.tabLayout === "vertical" ? "vertical" : "horizontal",
       density: p.density === "comfortable" ? "comfortable" : "compact",
       sidebarCollapsed: p.sidebarCollapsed === true,
       sidebarWidth:

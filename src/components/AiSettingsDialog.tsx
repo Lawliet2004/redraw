@@ -20,7 +20,6 @@ import {
 } from "../llm";
 import { isMobileOS } from "../platform";
 import Dialog from "./Dialog";
-import { IconGear, IconSparkle } from "./icons";
 
 const API_PRESETS = [
   {
@@ -47,39 +46,6 @@ const API_PRESETS = [
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
-export default function AiBar({
-  onAsk,
-  onSettings,
-}: {
-  busy: boolean;
-  theme: "light" | "dark";
-  onAsk: () => void;
-  onStop: () => void;
-  onSettings: () => void;
-}) {
-  return (
-    <div className="ai-bar workspace-surface">
-      <button
-        className="primary"
-        aria-label="✦ AI assistant"
-        title="AI assistant (Ctrl+Enter)"
-        onClick={onAsk}
-      >
-        <IconSparkle />
-        <span>AI assistant</span>
-      </button>
-      <button
-        className="icon-button"
-        title="Settings"
-        aria-label="Settings"
-        onClick={onSettings}
-      >
-        <IconGear />
-      </button>
-    </div>
-  );
-}
-
 export function AiSettingsDialog({
   config,
   onSave,
