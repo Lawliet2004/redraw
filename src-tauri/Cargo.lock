@@ -3526,7 +3526,7 @@ dependencies = [
 
 [[package]]
 name = "redraw"
-version = "0.1.2"
+version = "0.1.8"
 dependencies = [
  "keyring",
  "serde",

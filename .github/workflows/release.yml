@@ -117,7 +117,8 @@ jobs:
           rm -rf src-tauri/gen/android/app/src/main/assets
           mkdir -p src-tauri/gen/android/app/src/main/assets
           cp -r dist/* src-tauri/gen/android/app/src/main/assets/
-          printf 'tauri.android.versionCode=1\ntauri.android.versionName=0.1.1\n' > src-tauri/gen/android/app/tauri.properties
+          VERSION="${GITHUB_REF_NAME#v}"
+          printf "tauri.android.versionCode=8\ntauri.android.versionName=%s\n" "${VERSION:-0.1.8}" > src-tauri/gen/android/app/tauri.properties
           chmod +x src-tauri/gen/android/gradlew
           REDRAW_SKIP_RUST=1 ./src-tauri/gen/android/gradlew -p src-tauri/gen/android \
             :app:assembleArm64Release -PabiList=arm64-v8a -PtargetList=aarch64

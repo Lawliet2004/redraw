@@ -115,7 +115,7 @@ if (existsSync(dist)) {
 
 writeFileSync(
   path.join(root, "src-tauri", "gen", "android", "app", "tauri.properties"),
-  "tauri.android.versionCode=1\ntauri.android.versionName=0.1.0\n",
+  "tauri.android.versionCode=8\ntauri.android.versionName=0.1.8\n",
 );
 
 const gradlew = path.join(root, "src-tauri", "gen", "android", "gradlew.bat");

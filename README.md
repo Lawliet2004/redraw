@@ -75,8 +75,8 @@ npm run ios:build
 Push a version tag to build desktop + Android and attach files to the GitHub Release:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.8
+git push origin v0.1.8
 ```
 
 Workflow: `.github/workflows/release.yml`
