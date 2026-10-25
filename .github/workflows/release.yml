@@ -85,14 +85,22 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Install NDK and SDK components
+      - name: Setup Android NDK and SDK
         run: |
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1)
-          test -n "$SDKMANAGER"
-          sudo chown -R $USER:$USER "$ANDROID_HOME"
-          yes | "$SDKMANAGER" --licenses || true
-          "$SDKMANAGER" --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;35.0.0"
-          echo "$(dirname "$SDKMANAGER")" >> $GITHUB_PATH
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -1)
+          sudo chown -R $USER:$USER "$ANDROID_HOME" 2>/dev/null || true
+          NDK_FOUND=$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -1)
+          if [ -z "$NDK_FOUND" ] && [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses || true
+            "$SDKMANAGER" --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;35.0.0" || true
+            NDK_FOUND=$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -1)
+          fi
+          echo "Using NDK: $NDK_FOUND"
+          echo "NDK_HOME=$NDK_FOUND" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK_FOUND" >> $GITHUB_ENV
+          if [ -n "$SDKMANAGER" ]; then
+            echo "$(dirname "$SDKMANAGER")" >> $GITHUB_PATH
+          fi
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
       - uses: dtolnay/rust-toolchain@stable
@@ -110,14 +118,14 @@ jobs:
         run: npm run build
 
       - name: Build Android rust lib + APK
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
+          echo "NDK at: $NDK_HOME"
           TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CC_aarch64_linux_android="$TOOLCHAIN/aarch64-linux-android24-clang"
+          CLANG=$(find "$TOOLCHAIN" -name "aarch64-linux-android*-clang" ! -name "*++" | sort -V | head -1)
+          echo "Using clang: $CLANG"
+          export CC_aarch64_linux_android="$CLANG"
           export AR_aarch64_linux_android="$TOOLCHAIN/llvm-ar"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/aarch64-linux-android24-clang"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
           cargo build --manifest-path src-tauri/Cargo.toml --target aarch64-linux-android --release
           SO="src-tauri/target/aarch64-linux-android/release/libtauri_app_lib.so"
           test -f "$SO"
@@ -135,7 +143,10 @@ jobs:
 
       - name: Sign APK (debug key — sideload)
         run: |
-          BT="$ANDROID_HOME/build-tools/35.0.0"
+          ZIPALIGN=$(find "$ANDROID_HOME/build-tools" -name zipalign 2>/dev/null | sort -V | tail -1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | sort -V | tail -1)
+          echo "Using zipalign: $ZIPALIGN"
+          echo "Using apksigner: $APKSIGNER"
           KS="$HOME/.android/debug.keystore"
           mkdir -p "$HOME/.android"
           if [ ! -f "$KS" ]; then
@@ -144,10 +155,10 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
           UNSIGNED=$(ls src-tauri/gen/android/app/build/outputs/apk/arm64/release/*-unsigned.apk | head -1)
-          "$BT/zipalign" -f -p 4 "$UNSIGNED" redraw-android-arm64-aligned.apk
-          "$BT/apksigner" sign --ks "$KS" --ks-pass pass:android --key-pass pass:android \
+          "$ZIPALIGN" -f -p 4 "$UNSIGNED" redraw-android-arm64-aligned.apk
+          "$APKSIGNER" sign --ks "$KS" --ks-pass pass:android --key-pass pass:android \
             --out Redraw-android-arm64.apk redraw-android-arm64-aligned.apk
-          "$BT/apksigner" verify Redraw-android-arm64.apk
+          "$APKSIGNER" verify Redraw-android-arm64.apk
 
       - name: Upload Android APK
         uses: softprops/action-gh-release@v2
