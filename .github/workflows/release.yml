@@ -21,7 +21,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-latest
             target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
@@ -70,6 +70,8 @@ jobs:
 
   android:
     runs-on: ubuntu-22.04
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -83,10 +85,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Install NDK
-        run: sdkmanager --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;35.0.0"
+      - name: Install NDK and SDK components
+        run: |
+          sudo chown -R $USER:$USER "$ANDROID_HOME"
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;35.0.0"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
